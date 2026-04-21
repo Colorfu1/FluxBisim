@@ -1,0 +1,187 @@
+import math
+import os
+from importlib import import_module  # 动态导入模块并获取类
+
+import numpy as np
+import rootutils
+from isaacsim.core.api import World
+from isaacsim.sensors.camera import Camera
+
+rootutils.setup_root(__file__, pythonpath=True)
+
+from .robots import BaseRobot  # noqa: E402
+
+
+# from tasks import PickBanana
+class IsaacsimEnv:
+    def __init__(self, cfg):
+        self.cfg = cfg
+        self.cameras = []
+        self.task_name = None
+        self.task = None
+        self.world = None
+        self.robot = None
+        self._setup_environment()
+
+    def init_objects(self):
+        # 环境usd位于坐标原点
+        self.task.environment.init_object(
+            self.world, np.array([0.0, 0.0, 0.0]), np.array([1.0, 0.0, 0.0, 0.0])
+        )
+
+        # 获取机器人base的位姿信息
+        base_position = None
+        base_orientation = None
+
+        base_name = os.environ.get("BASE_NAME", "base_kitchen")
+
+        if hasattr(self.robot, "robot_cfg") and base_name in self.robot.robot_cfg:
+            base_cfg = self.robot.robot_cfg[base_name]
+            base_position = np.array(base_cfg.get("position", [0.0, 0.0, 0.0]))
+            base_orientation = np.array(
+                base_cfg.get("orientation", [1.0, 0.0, 0.0, 0.0])
+            )
+
+        for obj in self.task.objects:
+            obj.init_object(self.world, base_position, base_orientation)
+
+    def init_cameras(self):
+        """初始化摄像头"""
+        self.cameras = []
+        camera_cfg = self.cfg.get("cameras")
+        if not camera_cfg:
+            raise ValueError("配置中缺少摄像头设置")
+        for _, cam in camera_cfg.items():
+            camera = Camera(
+                prim_path=cam["prim_path"],
+                name=cam["name"],
+                frequency=cam["frequency"],
+                resolution=(cam["width"], cam["height"]),
+                # position = cam["position"],
+                # orientation = cam["oritentation"]
+            )
+            camera.set_local_pose(
+                translation=np.array(cam["translation"]),
+                orientation=np.array(cam["orientation"]),
+                camera_axes="usd",
+            )
+            camera.initialize()
+            # camera.set_focal_length(cam['focal_length']/10.0)
+            # camera.set_clipping_range(0.05, 1000.0)
+
+            fx, fy, cx, cy = cam["intrinsics"]
+            width, height = cam["width"], cam["height"]
+
+            # Calculate camera parameters
+            horizontal_aperture = 3 * 1e-3 * width
+            vertical_aperture = 3 * 1e-3 * height
+            focal_length_x = fx * 3 * 1e-3
+            focal_length_y = fy * 3 * 1e-3
+            focal_length = (
+                focal_length_x + focal_length_y
+            ) / 2  # The focal length in mm
+
+            # Set the camera parameters, note the unit conversion between Isaac Sim sensor and Kit
+            camera.set_focal_length(
+                focal_length / 10.0
+            )  # Convert from mm to cm (or 1/10th of a world unit)
+            camera.set_focus_distance(0.3)  # The focus distance in meters
+            camera.set_lens_aperture(
+                2.0 * 100.0
+            )  # Convert the f-stop to Isaac Sim units
+            camera.set_horizontal_aperture(
+                horizontal_aperture / 10.0
+            )  # Convert from mm to cm (or 1/10th of a world unit)
+            camera.set_vertical_aperture(vertical_aperture / 10.0)
+            camera.set_clipping_range(0.01, 1.0e2)
+
+            # Set the distortion coefficients, this is nessesary, when cx, cy are not in the center of the image
+            diagonal = 2 * math.sqrt(
+                max(cx, width - cx) ** 2 + max(cy, height - cy) ** 2
+            )
+            diagonal_fov = 2 * math.atan2(diagonal, fx + fy) * 180 / math.pi
+            camera.set_projection_type("fisheyePolynomial")
+            # D=np.zeros((8)):不考虑畸变。
+            camera.set_rational_polynomial_properties(
+                width, height, cx, cy, diagonal_fov, np.zeros((8))
+            )
+            self.cameras.append(camera)
+
+    def _setup_environment(self):
+        self.task_name = self.cfg.get("task")
+
+        module = import_module("tasks")
+        cls = getattr(module, self.task_name)
+        self.task = cls()
+
+        self.world = World(
+            stage_units_in_meters=1.0, physics_dt=1.0 / 30.0, rendering_dt=1.0 / 30.0
+        )
+        # self.world.scene.add_default_lighting()
+
+        self.robot = BaseRobot(self.cfg.get("robot"))
+        self.robot.init_robot(self.world)
+
+        self.init_objects()
+        self.init_cameras()
+
+    def reset(self):
+        self.world.reset()
+
+        for cam in self.cameras:
+            cam.post_reset()
+
+        self.task.randomize_objects_position()
+
+        self.robot.reset()
+
+    def apply_action(self, action):
+        self.robot.apply_action(action)
+
+    def get_robot_pos(self, robot1, robot2):
+        dof_pos = {}
+        dof_poses = (
+            robot1.get_joint_positions().tolist()
+            + robot2.get_joint_positions().tolist()
+        )
+        # print(dof_poses[0])
+        for i in range(1, len(dof_poses) + 1):
+            if i <= 8:
+                dof_pos[f"llink{i}"] = dof_poses[i - 1]
+            else:
+                dof_pos[f"rlink{i - 8}"] = dof_poses[i - 1]
+
+        return {"dof_pos": dof_pos}
+
+    def get_observation(self):
+        obs = {}
+        # 确保相机已正确初始化
+        if not self.cameras:
+            print("警告：相机列表为空，正在重新初始化相机...")
+            self.init_cameras()
+
+        for cam in self.cameras:
+            try:
+                obs[cam.name] = cam.get_current_frame()["rgba"][:, :, :3].copy()
+            except Exception as e:
+                print(f"获取相机 {cam.name} 数据时出错: {e}")
+                # 如果相机数据获取失败，可以返回空图像或重新初始化
+                obs[cam.name] = None
+
+        for obj in self.task.objects:
+            obs[obj.name] = obj.get_obj_pos()
+
+        obs[self.robot.name] = self.get_robot_pos(
+            self.robot.left_manipulator, self.robot.right_manipulator
+        )
+        return obs
+
+    def step(self, action=None):
+        # Placeholder: apply action to simulation
+        if action is not None:
+            self.apply_action(action)
+            # print("sim_time:", self.world.current_time)
+            self.world.step(render=True)
+
+        obs = self.get_observation()
+        return obs
