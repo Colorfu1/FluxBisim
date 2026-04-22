@@ -6,6 +6,7 @@ import rootutils
 rootutils.setup_root(__file__, pythonpath=True)
 
 from envs import BaseObject  # noqa: E402
+from tasks.utils import check_gripper, generate_point_in_circle  # noqa: E402
 
 
 class PickPlaceFruit:
@@ -21,19 +22,11 @@ class PickPlaceFruit:
         self.environment = BaseObject(self.table_name)
         self.checker = Checker(self.fruit_name, self.plate_name)
 
-    def _generate_point_in_circle(self, origin_x, origin_y, origin_z, radius=0.05):
-        """Sample a random point inside a circle."""
-        theta = np.random.uniform(0, 2 * np.pi)
-        r = radius * np.sqrt(np.random.uniform(0, 1))
-        x = origin_x + r * np.cos(theta)
-        y = origin_y + r * np.sin(theta)
-        return [x, y, origin_z]
-
     def randomize_objects_position(self):
         """Randomize object positions around their initial poses."""
         for obj in self.objects:
             if obj.name == self.fruit_name or obj.name == self.plate_name:
-                default_position = self._generate_point_in_circle(
+                default_position = generate_point_in_circle(
                     obj.init_poisition_global[0],
                     obj.init_poisition_global[1],
                     obj.init_poisition_global[2],
@@ -64,21 +57,12 @@ class Checker:
 
     def check_gripper(self, env):
         """Check whether the gripper is holding the object."""
-        current_ee_pos = env.robot.right_manipulator.end_effector.get_world_pose()[
-            0
-        ] + np.array([0.0, 0.0, -0.13])
-        fruit_position = env.world.scene.get_object(self.fruit_name).get_world_poses()[
-            0
-        ][0]
-
-        # Measure the distance between the end effector and the object.
-        ee_distance = np.linalg.norm(current_ee_pos - fruit_position)
-
-        if ee_distance > self.GRIPPER_THRESHOLD:
-            print("The gripper is not holding the object.")
-            return False
-        else:
-            return True
+        return check_gripper(
+            env,
+            object_name=self.fruit_name,
+            hand="right",
+            threshold=self.GRIPPER_THRESHOLD,
+        )
 
     def check(self, env):
         """Check whether the object is at the target position."""
@@ -94,4 +78,5 @@ class Checker:
 
         return (
             distance_xy <= self.PLACE_THRESHOLD_MIN
+            and not self.check_gripper(env)
         )  # The position threshold can be tuned if needed.

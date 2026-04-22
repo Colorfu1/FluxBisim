@@ -136,6 +136,7 @@ def collect_episode_data(
 
         if left_event in [4, 5, 6]:
             if not env.task.checker.check_gripper(env):
+                print("The gripper is not holding the object.")
                 break
         if right_event == 5:
             if not env.task.checker.check_drawer_open():

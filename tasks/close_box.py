@@ -2,22 +2,16 @@ import os
 
 import numpy as np
 import rootutils
-from isaacsim.core.prims import XFormPrim
 from scipy.spatial.transform import Rotation as R
 
 rootutils.setup_root(__file__, pythonpath=True)
 
 from envs import BaseObject  # noqa: E402
-
-
-def get_prim_world_quat(world, prim_path: str):
-    """Return the world position `(x, y, z)` of a prim."""
-    prim_view = XFormPrim(
-        prim_paths_expr=prim_path,
-        name=f"tmp_{prim_path.split('/')[-1]}",
-    )
-    _, quat = prim_view.get_world_poses()
-    return np.array(quat[0])
+from tasks.utils import (  # noqa: E402
+    check_gripper,
+    generate_point_in_circle,
+    get_prim_world_quat,
+)
 
 
 class CloseBox:
@@ -36,19 +30,11 @@ class CloseBox:
         self.environment = BaseObject(self.table_name)
         self.checker = Checker(nut_name=self.nut_name, box_name=self.box_name)
 
-    def _generate_point_in_circle(self, origin_x, origin_y, origin_z, radius=0.03):
-        """Sample a random point inside a circle."""
-        theta = np.random.uniform(0, 2 * np.pi)
-        r = radius * np.sqrt(np.random.uniform(0, 1))
-        x = origin_x + r * np.cos(theta)
-        y = origin_y + r * np.sin(theta)
-        return [x, y, origin_z]
-
     def randomize_objects_position(self):
         """Randomize only the nut while keeping the box fixed."""
         for obj in self.objects:
             if obj.name == self.nut_name:
-                default_position = self._generate_point_in_circle(
+                default_position = generate_point_in_circle(
                     obj.init_poisition_global[0],
                     obj.init_poisition_global[1],
                     obj.init_poisition_global[2],
@@ -80,20 +66,12 @@ class Checker:
 
     def check_gripper(self, env):
         """Check whether the left gripper is holding the nut."""
-        current_ee_pos = env.robot.left_manipulator.end_effector.get_world_pose()[
-            0
-        ] + np.array([0.0, 0.0, -0.13])
-        nut_pos = np.array(
-            env.world.scene.get_object(self.nut_name).get_world_poses()[0][0]
+        return check_gripper(
+            env,
+            object_name=self.nut_name,
+            hand="left",
+            threshold=self.GRIPPER_THRESHOLD,
         )
-
-        ee_distance = np.linalg.norm(current_ee_pos - nut_pos)
-
-        if ee_distance > self.GRIPPER_THRESHOLD:
-            print("The gripper is not holding the object.")
-            return False
-        else:
-            return True
 
     def check(self, env):
         """Check whether both the nut is in the box and the box is closed."""

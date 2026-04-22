@@ -86,6 +86,7 @@ def collect_episode_data(
 
         if right_event in [4, 5, 6, 7]:
             if not env.task.checker.check_gripper(env):
+                print("The gripper is not holding the object.")
                 break
 
         if cnt % sample_step == 0:
