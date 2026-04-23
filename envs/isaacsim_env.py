@@ -1,6 +1,6 @@
 import math
 import os
-from importlib import import_module  # 动态导入模块并获取类
+from importlib import import_module
 
 import numpy as np
 import rootutils
@@ -12,7 +12,6 @@ rootutils.setup_root(__file__, pythonpath=True)
 from .robots import BaseRobot  # noqa: E402
 
 
-# from tasks import PickBanana
 class IsaacsimEnv:
     def __init__(self, cfg):
         self.cfg = cfg
@@ -24,12 +23,12 @@ class IsaacsimEnv:
         self._setup_environment()
 
     def init_objects(self):
-        # 环境usd位于坐标原点
+        # The environment USD is placed at the world origin.
         self.task.environment.init_object(
             self.world, np.array([0.0, 0.0, 0.0]), np.array([1.0, 0.0, 0.0, 0.0])
         )
 
-        # 获取机器人base的位姿信息
+        # Retrieve the robot base pose.
         base_position = None
         base_orientation = None
 
@@ -46,19 +45,17 @@ class IsaacsimEnv:
             obj.init_object(self.world, base_position, base_orientation)
 
     def init_cameras(self):
-        """初始化摄像头"""
+        """Initialize cameras defined in the configuration."""
         self.cameras = []
         camera_cfg = self.cfg.get("cameras")
         if not camera_cfg:
-            raise ValueError("配置中缺少摄像头设置")
+            raise ValueError("Camera settings are missing from the configuration.")
         for _, cam in camera_cfg.items():
             camera = Camera(
                 prim_path=cam["prim_path"],
                 name=cam["name"],
                 frequency=cam["frequency"],
                 resolution=(cam["width"], cam["height"]),
-                # position = cam["position"],
-                # orientation = cam["oritentation"]
             )
             camera.set_local_pose(
                 translation=np.array(cam["translation"]),
@@ -101,7 +98,7 @@ class IsaacsimEnv:
             )
             diagonal_fov = 2 * math.atan2(diagonal, fx + fy) * 180 / math.pi
             camera.set_projection_type("fisheyePolynomial")
-            # D=np.zeros((8)):不考虑畸变。
+            # D=np.zeros((8)): disable distortion coefficients.
             camera.set_rational_polynomial_properties(
                 width, height, cx, cy, diagonal_fov, np.zeros((8))
             )
@@ -117,7 +114,6 @@ class IsaacsimEnv:
         self.world = World(
             stage_units_in_meters=1.0, physics_dt=1.0 / 30.0, rendering_dt=1.0 / 30.0
         )
-        # self.world.scene.add_default_lighting()
 
         self.robot = BaseRobot(self.cfg.get("robot"))
         self.robot.init_robot(self.world)
@@ -144,7 +140,6 @@ class IsaacsimEnv:
             robot1.get_joint_positions().tolist()
             + robot2.get_joint_positions().tolist()
         )
-        # print(dof_poses[0])
         for i in range(1, len(dof_poses) + 1):
             if i <= 8:
                 dof_pos[f"llink{i}"] = dof_poses[i - 1]
@@ -155,17 +150,17 @@ class IsaacsimEnv:
 
     def get_observation(self):
         obs = {}
-        # 确保相机已正确初始化
+        # Make sure the cameras have been initialized before reading frames.
         if not self.cameras:
-            print("警告：相机列表为空，正在重新初始化相机...")
+            print("Warning: camera list is empty, reinitializing cameras...")
             self.init_cameras()
 
         for cam in self.cameras:
             try:
                 obs[cam.name] = cam.get_current_frame()["rgba"][:, :, :3].copy()
             except Exception as e:
-                print(f"获取相机 {cam.name} 数据时出错: {e}")
-                # 如果相机数据获取失败，可以返回空图像或重新初始化
+                print(f"Failed to fetch frame from camera {cam.name}: {e}")
+                # Fall back to an empty observation when frame retrieval fails.
                 obs[cam.name] = None
 
         for obj in self.task.objects:
@@ -177,10 +172,8 @@ class IsaacsimEnv:
         return obs
 
     def step(self, action=None):
-        # Placeholder: apply action to simulation
         if action is not None:
             self.apply_action(action)
-            # print("sim_time:", self.world.current_time)
             self.world.step(render=True)
 
         obs = self.get_observation()
