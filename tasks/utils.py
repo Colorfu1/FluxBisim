@@ -43,7 +43,7 @@ def generate_point_in_circle(origin_x, origin_y, origin_z, radius=0.02):
 def check_gripper(
     env,
     object_name: str,
-    hand: str = "right",
+    hand: str = 'right',
     threshold: float = DEFAULT_GRIPPER_THRESHOLD,
     ee_offset: Sequence[float] = DEFAULT_EE_OFFSET,
 ) -> bool:
@@ -56,13 +56,10 @@ def check_gripper(
         threshold: Maximum end-effector-to-object distance for a valid grasp.
         ee_offset: Offset applied to the end-effector pose before distance measurement.
     """
-    manipulator = (
-        env.robot.left_manipulator
-        if hand == "left"
-        else env.robot.right_manipulator
-    )
-    current_ee_pos = manipulator.end_effector.get_world_pose()[0] + np.array(ee_offset)
+    manipulator = (env.robot.left_manipulator
+                   if hand == 'left' else env.robot.right_manipulator)
+    current_ee_pos = manipulator.end_effector.get_world_pose()[0] + np.array(
+        ee_offset)
     object_pos = np.array(
-        env.world.scene.get_object(object_name).get_world_poses()[0][0]
-    )
+        env.world.scene.get_object(object_name).get_world_poses()[0][0])
     return float(np.linalg.norm(current_ee_pos - object_pos)) <= threshold

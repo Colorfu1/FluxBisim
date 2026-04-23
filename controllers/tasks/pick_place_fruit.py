@@ -32,16 +32,18 @@ class PickPlaceFruitController(manipulators_controllers.PickPlaceController):
         end_effector_initial_height: float = 0.9,
     ) -> None:
         if events_dt is None:
-            events_dt = [0.008, 0.008, 0.5, 0.2, 0.008, 0.004, 0.008, 0.4, 0.008]
+            events_dt = [
+                0.008, 0.008, 0.5, 0.2, 0.008, 0.004, 0.008, 0.4, 0.008
+            ]
 
         if len(events_dt) != 9:
-            raise Exception("events dt length must be 9")
+            raise Exception('events dt length must be 9')
 
         super().__init__(
             name=name,
             cspace_controller=RMPFlowController(
-                name=name + "_cspace_controller", robot_articulation=robot_articulation
-            ),
+                name=name + '_cspace_controller',
+                robot_articulation=robot_articulation),
             gripper=gripper,
             events_dt=events_dt,
             end_effector_initial_height=end_effector_initial_height,
@@ -54,13 +56,12 @@ class PickPlaceFruitController(manipulators_controllers.PickPlaceController):
     ) -> None:
         if events_dt is not None:
             if not isinstance(events_dt, np.ndarray) and not isinstance(
-                events_dt, list
-            ):
-                raise Exception("events dt need to be list or numpy array")
+                    events_dt, list):
+                raise Exception('events dt need to be list or numpy array')
             elif isinstance(events_dt, np.ndarray):
                 events_dt = events_dt.tolist()
             if len(events_dt) != 9:
-                raise Exception("events dt length must be 9")
+                raise Exception('events dt length must be 9')
 
         super().reset(
             end_effector_initial_height=end_effector_initial_height,

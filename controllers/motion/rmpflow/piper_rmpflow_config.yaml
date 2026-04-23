@@ -52,7 +52,7 @@ rmp_params:
         proximity_metric_boost_scalar: 20.
         proximity_metric_boost_length_scale: .02
         xi_estimator_gate_std_dev: 20000.
-        accept_user_weights: false 
+        accept_user_weights: false
     axis_target_rmp:
         accel_p_gain: 210.
         accel_d_gain: 60.
@@ -106,4 +106,3 @@ body_collision_controllers:
      #  radius: .05
       - name: gripper_center
         radius: .05
-

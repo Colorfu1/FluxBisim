@@ -7,11 +7,9 @@ from scipy.spatial.transform import Rotation as R
 rootutils.setup_root(__file__, pythonpath=True)
 
 from envs import BaseObject  # noqa: E402
-from tasks.utils import (  # noqa: E402
-    check_gripper,
-    generate_point_in_circle,
-    get_prim_world_quat,
-)
+from tasks.utils import check_gripper  # noqa: E402
+from tasks.utils import generate_point_in_circle  # noqa: E402
+from tasks.utils import get_prim_world_quat  # noqa: E402
 
 
 class CloseBox:
@@ -19,9 +17,9 @@ class CloseBox:
     NUT_RANDOMIZATION_RADIUS_NOISE = 0.06
 
     def __init__(self):
-        self.nut_name = os.environ.get("NUT_NAME", "nut")
-        self.box_name = os.environ.get("BOX_NAME", "box")
-        self.table_name = os.environ.get("TABLE_NAME", "industry_table")
+        self.nut_name = os.environ.get('NUT_NAME', 'nut')
+        self.box_name = os.environ.get('BOX_NAME', 'box')
+        self.table_name = os.environ.get('TABLE_NAME', 'industry_table')
 
         self.objects = [
             BaseObject(self.nut_name),
@@ -40,16 +38,17 @@ class CloseBox:
                     obj.init_poisition_global[2],
                     radius=self.NUT_RANDOMIZATION_RADIUS,
                 )
-                obj.object.set_default_state(positions=np.array([default_position]))
+                obj.object.set_default_state(
+                    positions=np.array([default_position]))
 
             obj.object.post_reset()
 
         for obj in self.objects:
             if obj.name == self.nut_name or obj.name == self.box_name:
                 print(
-                    "obj.name:",
+                    'obj.name:',
                     obj.name,
-                    "new position:",
+                    'new position:',
                     obj.object.get_world_poses()[0].tolist()[0],
                 )
 
@@ -69,7 +68,7 @@ class Checker:
         return check_gripper(
             env,
             object_name=self.nut_name,
-            hand="left",
+            hand='left',
             threshold=self.GRIPPER_THRESHOLD,
         )
 
@@ -78,23 +77,21 @@ class Checker:
         nut = env.world.scene.get_object(self.nut_name)
         box = env.world.scene.get_object(self.box_name)
         if nut is None or box is None:
-            raise ValueError("Nut or box object does not exist.")
+            raise ValueError('Nut or box object does not exist.')
 
         nut_pos = np.array(nut.get_world_poses()[0][0])
         box_pos = np.array(box.get_world_poses()[0][0])
-        box_lid_quat = get_prim_world_quat(env.world, f"/World/{self.box_name}/box_lid")
-        box_lid_euler = R.from_quat(
-            [box_lid_quat[1], box_lid_quat[2], box_lid_quat[3], box_lid_quat[0]]
-        ).as_euler(
-            "xyz",
+        box_lid_quat = get_prim_world_quat(env.world,
+                                           f"/World/{self.box_name}/box_lid")
+        box_lid_euler = R.from_quat([
+            box_lid_quat[1], box_lid_quat[2], box_lid_quat[3], box_lid_quat[0]
+        ]).as_euler(
+            'xyz',
             degrees=True,
         )
 
         distance_xy = np.linalg.norm(nut_pos[:2] - box_pos[:2])
 
-        return (
-            distance_xy <= self.PLACE_THRESHOLD
-            and self.CLOSE_THRESHOLD_MIN_DEG
-            <= box_lid_euler[1]
-            <= self.CLOSE_THRESHOLD_MAX_DEG
-        )
+        return (distance_xy <= self.PLACE_THRESHOLD
+                and self.CLOSE_THRESHOLD_MIN_DEG <= box_lid_euler[1] <=
+                self.CLOSE_THRESHOLD_MAX_DEG)

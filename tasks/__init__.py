@@ -5,9 +5,9 @@ from .pull_push_drawer import PullPushDrawer as PullPushDrawer
 from .rotate_pitcher_lid import RotatePitcherLid as RotatePitcherLid
 
 __all__ = [
-    "CloseBox",
-    "PassBook",
-    "PickPlaceFruit",
-    "PullPushDrawer",
-    "RotatePitcherLid",
+    'CloseBox',
+    'PassBook',
+    'PickPlaceFruit',
+    'PullPushDrawer',
+    'RotatePitcherLid',
 ]

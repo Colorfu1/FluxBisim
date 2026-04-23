@@ -1,6 +1,6 @@
 from omni.isaac.kit import SimulationApp
 
-sim_app = SimulationApp({"headless": False})
+sim_app = SimulationApp({'headless': False})
 
 import argparse  # noqa: E402
 import os  # noqa: E402
@@ -14,15 +14,11 @@ from isaacsim.core.utils.rotations import euler_angles_to_quat  # noqa: E402
 rootutils.setup_root(__file__, pythonpath=True)
 
 from controllers.tasks.rotate_pitcher_lid import (  # noqa: E402
-    LeftArmPickController,
-    RightArmPickRotateController,
-)
-from data_collect.utils import (  # noqa: E402
-    append_hdf5,
-    extract_action_from_obs,
-    extract_state_from_obs,
-    init_hdf5,
-)
+    LeftArmPickController, RightArmPickRotateController)
+from data_collect.utils import append_hdf5  # noqa: E402
+from data_collect.utils import extract_action_from_obs  # noqa: E402
+from data_collect.utils import extract_state_from_obs  # noqa: E402
+from data_collect.utils import init_hdf5  # noqa: E402
 from envs import IsaacsimEnv  # noqa: E402
 
 
@@ -30,18 +26,22 @@ def setup_controllers(
     env: IsaacsimEnv,
 ) -> Tuple[LeftArmPickController, RightArmPickRotateController]:
     """Set up controllers for the left and right arms."""
-    left_events_dt = [0.008, 0.008, 0.5, 0.2, 0.04, 0.004, 0.004, 0.2, 0.008, 0.008]
-    right_events_dt = [0.008, 0.008, 0.5, 0.2, 0.01, 0.004, 0.004, 0.005, 0.2, 0.05]
+    left_events_dt = [
+        0.008, 0.008, 0.5, 0.2, 0.04, 0.004, 0.004, 0.2, 0.008, 0.008
+    ]
+    right_events_dt = [
+        0.008, 0.008, 0.5, 0.2, 0.01, 0.004, 0.004, 0.005, 0.2, 0.05
+    ]
 
     left_controller = LeftArmPickController(
-        name="left_controller",
+        name='left_controller',
         robot_articulation=env.robot.left_manipulator,
         gripper=env.robot.left_manipulator.gripper,
         events_dt=left_events_dt,
     )
 
     right_controller = RightArmPickRotateController(
-        name="right_controller",
+        name='right_controller',
         robot_articulation=env.robot.right_manipulator,
         gripper=env.robot.right_manipulator.gripper,
         events_dt=right_events_dt,
@@ -59,26 +59,23 @@ def collect_episode_data(
     """Collect data for a single episode with dual-arm collaboration."""
     obs = env.step()
 
-    episode_data = {"states": [], "actions": []}
+    episode_data = {'states': [], 'actions': []}
 
     cnt = 0
     sample_step = 1
 
-    left_picking_position = np.array(obs[pitcher_name]["pos"]) + np.array(
-        [-0.088, 0.0, 0.0]
-    )
-    left_placing_position = np.array(obs[pitcher_name]["pos"]) + np.array(
-        [0.0, 0.2, 0.0]
-    )
+    left_picking_position = np.array(obs[pitcher_name]['pos']) + np.array(
+        [-0.088, 0.0, 0.0])
+    left_placing_position = np.array(obs[pitcher_name]['pos']) + np.array(
+        [0.0, 0.2, 0.0])
     left_target_orientation = euler_angles_to_quat(np.array([0, np.pi / 2, 0]))
 
-    right_picking_position = np.array(obs[lid_name]["pos"]) + np.array(
-        [-0.01, 0.01, 0.065]
-    )
-    right_placing_position = np.array(obs[pitcher_name]["pos"]) + np.array(
-        [-0.125, 0.115, 0.184]
-    )
-    right_target_orientation = euler_angles_to_quat(np.array([0, np.pi, np.pi / 2]))
+    right_picking_position = np.array(obs[lid_name]['pos']) + np.array(
+        [-0.01, 0.01, 0.065])
+    right_placing_position = np.array(obs[pitcher_name]['pos']) + np.array(
+        [-0.125, 0.115, 0.184])
+    right_target_orientation = euler_angles_to_quat(
+        np.array([0, np.pi, np.pi / 2]))
 
     while not right_controller.is_done():
         left_event = left_controller.get_current_event()
@@ -86,19 +83,19 @@ def collect_episode_data(
 
         if right_event in [4, 5, 6, 7]:
             if not env.task.checker.check_gripper(env):
-                print("The gripper is not holding the object.")
+                print('The gripper is not holding the object.')
                 break
 
         if cnt % sample_step == 0:
             state = extract_state_from_obs(obs)
-            episode_data["states"].append(state)
+            episode_data['states'].append(state)
 
         right_actions = right_controller.forward(
             picking_position=right_picking_position,
             placing_position=right_placing_position,
-            current_joint_positions=np.array(
-                list(obs["piper"]["dof_pos"].values())[8:], dtype=float
-            ),
+            current_joint_positions=np.array(list(
+                obs['piper']['dof_pos'].values())[8:],
+                                             dtype=float),
             end_effector_orientation=right_target_orientation,
             end_effector_offset=np.array([0.0, 0.0, 0.07]),
         )
@@ -107,9 +104,9 @@ def collect_episode_data(
             left_actions = left_controller.forward(
                 picking_position=left_picking_position,
                 placing_position=left_placing_position,
-                current_joint_positions=np.array(
-                    list(obs["piper"]["dof_pos"].values())[:8], dtype=float
-                ),
+                current_joint_positions=np.array(list(
+                    obs['piper']['dof_pos'].values())[:8],
+                                                 dtype=float),
                 end_effector_orientation=left_target_orientation,
                 end_effector_offset=np.array([-0.3, 0.084, 0.110]),
             )
@@ -118,15 +115,15 @@ def collect_episode_data(
             obs = env.step([None, right_actions])
 
         if left_event in [3]:
-            obs["piper"]["dof_pos"]["llink7"] = 0.0
-            obs["piper"]["dof_pos"]["llink8"] = 0.0
+            obs['piper']['dof_pos']['llink7'] = 0.0
+            obs['piper']['dof_pos']['llink8'] = 0.0
         if right_event in [3, 4, 5, 6, 7]:
-            obs["piper"]["dof_pos"]["rlink7"] = 0.0
-            obs["piper"]["dof_pos"]["rlink8"] = 0.0
+            obs['piper']['dof_pos']['rlink7'] = 0.0
+            obs['piper']['dof_pos']['rlink8'] = 0.0
 
         if cnt % sample_step == 0:
             action = extract_action_from_obs(obs)
-            episode_data["actions"].append(action)
+            episode_data['actions'].append(action)
 
         cnt += 1
 
@@ -135,30 +132,33 @@ def collect_episode_data(
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--env", type=str, default="apartmentshort")
-    parser.add_argument("--config", type=str, default="pitcher_lid_rotate_config.yaml")
-    parser.add_argument(
-        "--data_path", type=str, default=None, help="Path to save the collected data"
-    )
+    parser.add_argument('--env', type=str, default='apartmentshort')
+    parser.add_argument('--config',
+                        type=str,
+                        default='pitcher_lid_rotate_config.yaml')
+    parser.add_argument('--data_path',
+                        type=str,
+                        default=None,
+                        help='Path to save the collected data')
     args = parser.parse_args()
 
     cfg_path = os.path.join(os.path.dirname(__file__), args.config)
-    with open(cfg_path, "r", encoding="utf-8") as file:
+    with open(cfg_path, 'r', encoding='utf-8') as file:
         config = yaml.safe_load(file)
 
     table_name = f"{args.env}_table"
-    os.environ["TABLE_NAME"] = table_name
+    os.environ['TABLE_NAME'] = table_name
     base_name = f"base_{args.env}"
-    os.environ["BASE_NAME"] = base_name
+    os.environ['BASE_NAME'] = base_name
 
-    pitcher_name = config.get("pitcher", "pitcher")
-    os.environ["PITCHER_NAME"] = pitcher_name
-    lid_name = config.get("pitcherlid", "pitcherlid")
-    os.environ["LID_NAME"] = lid_name
+    pitcher_name = config.get('pitcher', 'pitcher')
+    os.environ['PITCHER_NAME'] = pitcher_name
+    lid_name = config.get('pitcherlid', 'pitcherlid')
+    os.environ['LID_NAME'] = lid_name
 
     env = IsaacsimEnv(config)
     env.reset()
-    max_demo = config.get("max_demo", 100)
+    max_demo = config.get('max_demo', 100)
     episodes = []
 
     for i in range(60):
@@ -191,35 +191,38 @@ def main():
                 data_path = args.data_path
             else:
                 data_path = os.path.join(
-                    os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-                    "data",
+                    os.path.dirname(os.path.dirname(
+                        os.path.dirname(__file__))),
+                    'data',
                     args.env,
                     env.task_name,
                 )
 
             os.makedirs(data_path, exist_ok=True)
-            h5_path = os.path.join(data_path, f"episode_{len(episodes) - 1:05d}.hdf5")
+            h5_path = os.path.join(
+                data_path,
+                f"episode_{len(episodes) - 1:05d}.hdf5")  # noqa: E231
 
-            init_hdf5(h5_path, episode_data["states"][0])
+            init_hdf5(h5_path, episode_data['states'][0])
 
-            steps = len(episode_data["states"])
+            steps = len(episode_data['states'])
 
             for i in range(steps):
-                meta_data = episode_data["states"][i].copy()
-                if i < len(episode_data["actions"]):
-                    meta_data["action"] = episode_data["actions"][i]
+                meta_data = episode_data['states'][i].copy()
+                if i < len(episode_data['actions']):
+                    meta_data['action'] = episode_data['actions'][i]
                 append_hdf5(h5_path, meta_data)
             print(
-                "Success, states:",
-                len(episode_data["states"]),
-                "actions:",
-                len(episode_data["actions"]),
+                'Success, states:',
+                len(episode_data['states']),
+                'actions:',
+                len(episode_data['actions']),
             )
         else:
-            print("Failed")
+            print('Failed')
 
     sim_app.close()
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

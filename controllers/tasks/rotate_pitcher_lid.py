@@ -45,13 +45,15 @@ class LeftArmPickController(manipulators_controllers.PickPlaceController):
         end_effector_initial_height: float = 0.77,
     ) -> None:
         if events_dt is None:
-            events_dt = [0.008, 0.008, 1, 0.02, 0.04, 0.004, 0.004, 0.2, 0.008, 0.008]
+            events_dt = [
+                0.008, 0.008, 1, 0.02, 0.04, 0.004, 0.004, 0.2, 0.008, 0.008
+            ]
 
         super().__init__(
             name=name,
             cspace_controller=RMPFlowController(
-                name=name + "_cspace_controller", robot_articulation=robot_articulation
-            ),
+                name=name + '_cspace_controller',
+                robot_articulation=robot_articulation),
             gripper=gripper,
             events_dt=events_dt,
             end_effector_initial_height=end_effector_initial_height,
@@ -98,11 +100,13 @@ class RightArmPickRotateController(BaseController):
         end_effector_initial_height: typing.Optional[float] = None,
     ) -> None:
         if events_dt is None:
-            events_dt = [0.008, 0.008, 1, 0.01, 0.004, 0.004, 0.004, 0.005, 0.04, 0.1]
+            events_dt = [
+                0.008, 0.008, 1, 0.01, 0.004, 0.004, 0.004, 0.005, 0.04, 0.1
+            ]
 
         cspace_controller = RMPFlowController(
-            name=name + "_cspace_controller", robot_articulation=robot_articulation
-        )
+            name=name + '_cspace_controller',
+            robot_articulation=robot_articulation)
 
         super().__init__(name=name)
         self._event = 0
@@ -114,13 +118,13 @@ class RightArmPickRotateController(BaseController):
         self._events_dt = events_dt
 
         if not isinstance(self._events_dt, np.ndarray) and not isinstance(
-            self._events_dt, list
-        ):
-            raise Exception("events dt need to be list or numpy array")
+                self._events_dt, list):
+            raise Exception('events dt need to be list or numpy array')
         elif isinstance(self._events_dt, np.ndarray):
             self._events_dt = self._events_dt.tolist()
         if len(self._events_dt) > 10:
-            raise Exception("events dt length must be less than or equal to 10")
+            raise Exception(
+                'events dt length must be less than or equal to 10')
 
         self._cspace_controller = cspace_controller
         self._gripper = gripper
@@ -169,9 +173,9 @@ class RightArmPickRotateController(BaseController):
             raise ValueError()
         return h
 
-    def _rotate_wrist(
-        self, current_joint_positions: np.ndarray, offset: float = 0.0
-    ) -> ArticulationAction:
+    def _rotate_wrist(self,
+                      current_joint_positions: np.ndarray,
+                      offset: float = 0.0) -> ArticulationAction:
         twist_idx = 5
         stabilize_indices = [6, 7]
         target_positions = current_joint_positions.copy()
@@ -197,16 +201,14 @@ class RightArmPickRotateController(BaseController):
 
         if self._event in [2, 9]:
             target_joint_positions = ArticulationAction(
-                joint_positions=[None] * current_joint_positions.shape[0]
-            )
+                joint_positions=[None] * current_joint_positions.shape[0])
         elif self._event == 3:
-            target_joint_positions = self._gripper.forward(action="close")
+            target_joint_positions = self._gripper.forward(action='close')
         elif self._event == 7:
             target_joint_positions = self._rotate_wrist(
-                current_joint_positions, offset=3.1
-            )
+                current_joint_positions, offset=3.1)
         elif self._event == 8:
-            target_joint_positions = self._gripper.forward(action="open")
+            target_joint_positions = self._gripper.forward(action='open')
         else:
             if self._event in [0, 1]:
                 self._current_target_x = picking_position[0]
@@ -220,13 +222,11 @@ class RightArmPickRotateController(BaseController):
                 self._current_target_y,
             )
             target_height = self._get_target_hs(placing_position[2])
-            position_target = np.array(
-                [
-                    interpolated_xy[0] + end_effector_offset[0],
-                    interpolated_xy[1] + end_effector_offset[1],
-                    target_height + end_effector_offset[2],
-                ]
-            )
+            position_target = np.array([
+                interpolated_xy[0] + end_effector_offset[0],
+                interpolated_xy[1] + end_effector_offset[1],
+                target_height + end_effector_offset[2],
+            ])
             orientation_target = end_effector_orientation
 
             target_joint_positions = self._cspace_controller.forward(
@@ -256,13 +256,14 @@ class RightArmPickRotateController(BaseController):
         if events_dt is not None:
             self._events_dt = events_dt
             if not isinstance(self._events_dt, np.ndarray) and not isinstance(
-                self._events_dt, list
-            ):
-                raise Exception("event velocities need to be list or numpy array")
+                    self._events_dt, list):
+                raise Exception(
+                    'event velocities need to be list or numpy array')
             elif isinstance(self._events_dt, np.ndarray):
                 self._events_dt = self._events_dt.tolist()
             if len(self._events_dt) > 10:
-                raise Exception("events dt length must be less than or equal to 10")
+                raise Exception(
+                    'events dt length must be less than or equal to 10')
         return
 
     def is_done(self) -> bool:
