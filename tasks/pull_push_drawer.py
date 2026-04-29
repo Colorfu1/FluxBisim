@@ -1,3 +1,5 @@
+"""PullPushDrawer task: open a drawer, place an object inside, and close it."""
+
 import os
 
 import numpy as np
@@ -12,10 +14,19 @@ from tasks.utils import get_prim_world_pos  # noqa: E402
 
 
 class PullPushDrawer:
+    """Scene definition for the PullPushDrawer task.
+
+    Holds the scene objects (manipulated object, drawer, table) and a
+    :class:`Checker` instance that decides when the task is complete.
+    """
+
+    # Randomization radius applied to object positions at each reset.
     RANDOMIZATION_RADIUS = 0.01
+    # Additional noise amplitude (reserved for future use).
     RANDOMIZATION_RADIUS_NOISE = 0.02
 
     def __init__(self):
+        """Create the task scene and its success checker."""
         self.object_name = os.environ.get('OBJECT_NAME', 'apple_drawer')
         self.drawer_name = os.environ.get('DRAWER_NAME', 'drawer')
         self.table_name = os.environ.get('TABLE_NAME', 'kitchen_table')
@@ -54,20 +65,27 @@ class PullPushDrawer:
 
 
 class Checker:
-    POSITION_THRESHOLD = 0.05  # Maximum distance to drawer target position.
-    MIN_OPEN_DIST = 0.10  # Minimum drawer opening distance.
-    MAX_CLOSED_DIST = 0.02  # Maximum drawer closing distance.
-    GRIPPER_THRESHOLD = 0.2  # Maximum EE-to-object distance for a valid grasp.
-    DRAWER_OFFSET = 0.04646722  # Baseline offset for drawer distance measurement.
+    """Success checker for the PullPushDrawer task."""
+
+    # Maximum xy distance between the object and the target position in the drawer.
+    POSITION_THRESHOLD = 0.05
+    # Minimum distance the drawer must be pulled open during the episode.
+    MIN_OPEN_DIST = 0.10
+    # Maximum distance that still counts as "drawer closed".
+    MAX_CLOSED_DIST = 0.02
+    # Maximum end-effector-to-object distance that still counts as grasped.
+    GRIPPER_THRESHOLD = 0.2
+    # Baseline offset (in metres) subtracted when measuring the drawer opening.
+    DRAWER_OFFSET = 0.04646722
 
     def __init__(self, object_name, drawer_name):
-        """Initialize the checker for the pull-push drawer task."""
+        """Initialize the checker with the scene object names."""
         self.object_name = object_name
         self.drawer_name = drawer_name
         self.max_drawer_dist = 0.0
 
     def check_gripper(self, env):
-        """Check whether the gripper is holding the object."""
+        """Check whether the left gripper is close enough to grasp the object."""
         return check_gripper(
             env,
             object_name=self.object_name,
@@ -76,7 +94,7 @@ class Checker:
         )
 
     def _get_drawer_distance(self, env):
-        """Calculate the current drawer opening distance."""
+        """Return the current drawer opening distance in metres."""
         drawer_front_pos = get_prim_world_pos(env.world,
                                               '/World/drawer/E_drawer2_7')
         target_part_pos = get_prim_world_pos(
@@ -85,18 +103,21 @@ class Checker:
                               target_part_pos) - self.DRAWER_OFFSET
 
     def calculate_open_distance(self, env):
+        """Update the running maximum of the drawer opening distance."""
         distance = self._get_drawer_distance(env)
         if distance > self.max_drawer_dist:
             self.max_drawer_dist = distance
 
     def check_drawer_open(self):
+        """Return ``True`` if the drawer has been pulled open at least ``MIN_OPEN_DIST``."""
         return self.max_drawer_dist > self.MIN_OPEN_DIST
 
     def check_drawer_closed(self, env):
+        """Return ``True`` if the drawer is currently closed."""
         return self._get_drawer_distance(env) < self.MAX_CLOSED_DIST
 
     def check(self, env):
-        """Check whether the task is complete."""
+        """Return ``True`` once the object is in place and the drawer is closed."""
         object = env.world.scene.get_object(self.object_name)
         drawer = env.world.scene.get_object(self.drawer_name)
         if object is None or drawer is None:

@@ -1,3 +1,5 @@
+"""CloseBox task: place a nut into a box and close the box lid."""
+
 import os
 
 import numpy as np
@@ -13,10 +15,19 @@ from tasks.utils import get_prim_world_quat  # noqa: E402
 
 
 class CloseBox:
+    """Scene definition for the CloseBox task.
+
+    Holds the scene objects (nut, box, table) and a :class:`Checker` instance
+    that decides when the task is complete.
+    """
+
+    # Randomization radius applied to the nut position at each reset.
     NUT_RANDOMIZATION_RADIUS = 0.03
+    # Additional noise amplitude (reserved for future use).
     NUT_RANDOMIZATION_RADIUS_NOISE = 0.06
 
     def __init__(self):
+        """Create the task scene and its success checker."""
         self.nut_name = os.environ.get('NUT_NAME', 'nut')
         self.box_name = os.environ.get('BOX_NAME', 'box')
         self.table_name = os.environ.get('TABLE_NAME', 'industry_table')
@@ -29,7 +40,7 @@ class CloseBox:
         self.checker = Checker(nut_name=self.nut_name, box_name=self.box_name)
 
     def randomize_objects_position(self):
-        """Randomize only the nut while keeping the box fixed."""
+        """Randomize the nut position while keeping the box fixed."""
         for obj in self.objects:
             if obj.name == self.nut_name:
                 default_position = generate_point_in_circle(
@@ -54,17 +65,24 @@ class CloseBox:
 
 
 class Checker:
+    """Success checker for the CloseBox task."""
+
+    # Maximum xy distance from the nut to the box centre that still counts
+    # as "inside the box".
     PLACE_THRESHOLD = 0.15
+    # Angular range (degrees) on the pitch axis for which the lid counts as closed.
     CLOSE_THRESHOLD_MIN_DEG = 10.0
     CLOSE_THRESHOLD_MAX_DEG = 15.0
+    # Maximum end-effector-to-object distance that still counts as grasped.
     GRIPPER_THRESHOLD = 0.2
 
     def __init__(self, nut_name, box_name):
+        """Initialize the checker with the scene object names."""
         self.nut_name = nut_name
         self.box_name = box_name
 
     def check_gripper(self, env):
-        """Check whether the left gripper is holding the nut."""
+        """Check whether the left gripper is close enough to grasp the nut."""
         return check_gripper(
             env,
             object_name=self.nut_name,
@@ -73,7 +91,7 @@ class Checker:
         )
 
     def check(self, env):
-        """Check whether both the nut is in the box and the box is closed."""
+        """Return ``True`` if the nut is inside the box and the lid is closed."""
         nut = env.world.scene.get_object(self.nut_name)
         box = env.world.scene.get_object(self.box_name)
         if nut is None or box is None:

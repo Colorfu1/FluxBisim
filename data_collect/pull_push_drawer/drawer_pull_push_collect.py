@@ -1,3 +1,11 @@
+"""Data-collection script for the PullPushDrawer task.
+
+The right arm pulls the drawer open while the left arm picks the target
+object; the left arm then drops the object inside the drawer and the right
+arm pushes the drawer closed. ``(observation, action)`` pairs from both
+phases are recorded into an HDF5 file for each successful episode.
+"""
+
 from omni.isaac.kit import SimulationApp
 
 sim_app = SimulationApp({'headless': False})
@@ -25,7 +33,14 @@ from envs import IsaacsimEnv  # noqa: E402
 def setup_controllers(
     env: IsaacsimEnv,
 ) -> Tuple[LeftArmPickPlaceController, RightArmPullPushController]:
-    """Set up controllers for the left and right arms."""
+    """Build and return the scripted controllers for both arms.
+
+    Args:
+        env: Active Isaac Sim environment.
+
+    Returns:
+        A tuple ``(left_controller, right_controller)`` ready for data collection.
+    """
     left_events_dt = [
         0.01, 0.01, 0.5, 0.2, 0.008, 0.004, 0.008, 0.4, 0.01, 0.01
     ]
@@ -54,7 +69,19 @@ def collect_episode_data(
     object_name: str,
     drawer_name: str,
 ) -> Dict[str, Any]:
-    """Collect data for a single episode with dual-arm collaboration."""
+    """Run a single episode with dual-arm collaboration and record the data.
+
+    Args:
+        env: Active Isaac Sim environment.
+        left_controller: Scripted left-arm pick-and-place controller.
+        right_controller: Scripted right-arm pull/push controller.
+        object_name: Scene object name of the item to place into the drawer.
+        drawer_name: Scene object name of the target drawer.
+
+    Returns:
+        A dict with two parallel lists under the keys ``'states'`` and
+        ``'actions'``.
+    """
     obs = env.step()
 
     episode_data = {'states': [], 'actions': []}
@@ -62,6 +89,7 @@ def collect_episode_data(
     cnt = 0
     sample_step = 1
 
+    # Left-arm waypoints: pick the object and drop it inside the drawer.
     left_picking_position = np.array(obs[object_name]['pos']) + np.array(
         [0.0, 0.0, 0.0])
     left_placing_position = np.array(obs[drawer_name]['pos']) + np.array(
@@ -69,6 +97,7 @@ def collect_episode_data(
     left_target_orientation = euler_angles_to_quat(
         np.array([0.0, np.pi, np.pi / 2]))
 
+    # Right-arm waypoints: grasp the drawer handle, pull then push it back.
     right_push_position = np.array(obs[drawer_name]['pos']) + np.array(
         [0.0, -0.095, 0.15])
     right_pull_position = np.array(obs[drawer_name]['pos']) + np.array(
@@ -76,11 +105,13 @@ def collect_episode_data(
     right_target_orientation = euler_angles_to_quat(
         np.array([-np.pi / 2, np.pi, 0.0]))
 
-    # Phase 1: the right arm pulls drawer while the left arm picks object
+    # Phase 1: the right arm pulls the drawer open while the left arm grasps
+    # the object; runs until the right arm reaches its open-state event.
     while right_controller.get_current_event() < 5:
         left_event = left_controller.get_current_event()
         right_event = right_controller.get_current_event()
 
+        # Sample the open distance once the drawer is fully pulled open.
         if right_event == 4:
             env.task.checker.calculate_open_distance(env)
 
@@ -112,6 +143,7 @@ def collect_episode_data(
         else:
             obs = env.step([None, right_actions])
 
+        # Clamp gripper joints while the respective arm should hold the object.
         if left_event in [3, 4, 5, 6]:
             obs['piper']['dof_pos']['llink7'] = 0.0
             obs['piper']['dof_pos']['llink8'] = 0.0
@@ -125,15 +157,18 @@ def collect_episode_data(
 
         cnt += 1
 
-    # Phase 2: the left arm places object then the right arm completes pulling drawer
+    # Phase 2: the left arm places the object into the drawer; once it has
+    # finished, the right arm pushes the drawer closed.
     while not right_controller.is_done():
         left_event = left_controller.get_current_event()
         right_event = right_controller.get_current_event()
 
+        # Abort the episode early when the left gripper loses the object.
         if left_event in [4, 5, 6]:
             if not env.task.checker.check_gripper(env):
                 print('The gripper is not holding the object.')
                 break
+        # Abort if the drawer accidentally closed while the left arm placed.
         if right_event == 5:
             if not env.task.checker.check_drawer_open():
                 break
@@ -166,7 +201,7 @@ def collect_episode_data(
             )
             obs = env.step([left_actions, right_actions])
 
-        # Reset joint positions during grasping events for left arm
+        # Clamp gripper joints while the respective arm should hold the object.
         if left_event in [3, 4, 5, 6]:
             obs['piper']['dof_pos']['llink7'] = 0.0
             obs['piper']['dof_pos']['llink8'] = 0.0
@@ -184,6 +219,7 @@ def collect_episode_data(
 
 
 def main():
+    """Parse CLI arguments, run the collection loop and save successful episodes."""
     parser = argparse.ArgumentParser()
     parser.add_argument('--env', type=str, default='apartment')
     parser.add_argument('--config',
@@ -199,6 +235,7 @@ def main():
     with open(cfg_path, 'r', encoding='utf-8') as file:
         config = yaml.safe_load(file)
 
+    # Populate task-specific environment variables consumed by the task class.
     table_name = f"{args.env}_table"
     os.environ['TABLE_NAME'] = table_name
     base_name = f"base_{args.env}"
@@ -214,6 +251,7 @@ def main():
     max_demo = config.get('max_demo', 100)
     episodes = []
 
+    # Let the simulator settle before starting the first episode.
     for i in range(60):
         env.world.step(render=True)
 

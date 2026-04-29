@@ -1,3 +1,9 @@
+"""Data-collection script for the PickPlaceFruit task.
+
+The right arm picks the fruit and places it on the plate. ``(observation,
+action)`` pairs are recorded into an HDF5 file for each successful episode.
+"""
+
 from omni.isaac.kit import SimulationApp
 
 sim_app = SimulationApp({'headless': False})
@@ -25,8 +31,15 @@ from envs import IsaacsimEnv  # noqa: E402
 def setup_controllers(
     env: IsaacsimEnv,
 ) -> Tuple[PickPlaceFruitController, PickPlaceFruitController]:
-    """Set up controllers for the right arms."""
-    right_events_dt = [0.008, 0.008, 0.5, 0.2, 0.008, 0.004, 0.008, 0.4, 0.008]
+    """Build and return the scripted controller for the right arm.
+
+    Args:
+        env: Active Isaac Sim environment.
+
+    Returns:
+        The right-arm pick-and-place controller used to collect demonstrations.
+    """
+    right_events_dt = [0.01, 0.005, 0.5, 0.2, 0.008, 0.005, 0.008, 0.4, 0.008]
     right_controller = PickPlaceFruitController(
         name='right_controller',
         robot_articulation=env.robot.right_manipulator,
@@ -42,7 +55,18 @@ def collect_episode_data(
     fruit_name: str,
     plate_name: str,
 ) -> Dict[str, Any]:
-    """Collect data for a single episode."""
+    """Run a single episode with the right arm and record the data.
+
+    Args:
+        env: Active Isaac Sim environment.
+        right_controller: Scripted right-arm pick-and-place controller.
+        fruit_name: Scene object name of the fruit to pick.
+        plate_name: Scene object name of the target plate.
+
+    Returns:
+        A dict with two parallel lists under the keys ``'states'`` and
+        ``'actions'``.
+    """
     obs = env.step()
 
     episode_data = {'states': [], 'actions': []}
@@ -53,6 +77,7 @@ def collect_episode_data(
     while not right_controller.is_done():
         event = right_controller.get_current_event()
 
+        # Abort the episode early when the gripper has lost the fruit.
         if event in [4, 5, 6]:
             if not env.task.checker.check_gripper(env):
                 print('The gripper is not holding the object.')
@@ -78,6 +103,7 @@ def collect_episode_data(
 
         obs = env.step([right_actions])
 
+        # Clamp gripper joints while the fruit should be grasped.
         if event in [3, 4, 5, 6]:
             obs['piper']['dof_pos']['rlink7'] = 0.0
             obs['piper']['dof_pos']['rlink8'] = 0.0
@@ -92,6 +118,7 @@ def collect_episode_data(
 
 
 def main():
+    """Parse CLI arguments, run the collection loop and save successful episodes."""
     parser = argparse.ArgumentParser()
     parser.add_argument('--env', type=str, default='kitchen')
     parser.add_argument('--config',
@@ -107,6 +134,7 @@ def main():
     with open(cfg_path, 'r', encoding='utf-8') as file:
         config = yaml.safe_load(file)
 
+    # Populate task-specific environment variables consumed by the task class.
     table_name = f"{args.env}_table"
     os.environ['TABLE_NAME'] = table_name
     base_name = f"base_{args.env}"
@@ -122,6 +150,7 @@ def main():
     max_demo = config.get('max_demo', 100)
     episodes = []
 
+    # Let the simulator settle before starting the first episode.
     for i in range(60):
         env.world.step(render=True)
 

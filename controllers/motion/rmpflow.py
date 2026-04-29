@@ -1,3 +1,5 @@
+"""RMPflow-based motion policy controller for a single 7-DoF arm."""
+
 import os
 
 import isaacsim.robot_motion.motion_generation as mg
@@ -5,6 +7,12 @@ from isaacsim.core.prims import SingleArticulation
 
 
 class RMPFlowController(mg.MotionPolicyController):
+    """Cartesian-space controller using the RMPflow motion policy.
+
+    The controller loads the robot description, RMPflow configuration and URDF
+    files bundled under ``controllers/motion/rmpflow`` and targets the
+    ``gripper_base`` frame of the arm.
+    """
 
     def __init__(
         self,
@@ -12,6 +20,13 @@ class RMPFlowController(mg.MotionPolicyController):
         robot_articulation: SingleArticulation,
         physics_dt: float = 1.0 / 30.0,
     ) -> None:
+        """Construct the RMPflow controller for a given articulation.
+
+        Args:
+            name: Controller name used for logging and bookkeeping.
+            robot_articulation: The arm articulation to be controlled.
+            physics_dt: Physics time step used by the motion policy.
+        """
         motion_path = os.path.dirname(__file__)
         cfg_path = os.path.join(motion_path, 'rmpflow')
         self.rmpflow = mg.lula.motion_policies.RmpFlow(
@@ -40,6 +55,7 @@ class RMPFlowController(mg.MotionPolicyController):
         )
 
     def reset(self):
+        """Reset the motion policy and restore the cached robot base pose."""
         mg.MotionPolicyController.reset(self)
         self._motion_policy.set_robot_base_pose(
             robot_position=self._default_position,

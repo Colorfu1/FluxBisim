@@ -1,3 +1,5 @@
+"""PassBook task: hand a book from one arm to the other and place it on the bookend."""
+
 import os
 
 import numpy as np
@@ -10,12 +12,21 @@ from tasks.utils import check_gripper, generate_point_in_circle  # noqa: E402
 
 
 class PassBook:
+    """Scene definition for the PassBook task.
+
+    Holds the scene objects (book, bookend, table) and a :class:`Checker`
+    instance that decides when the task is complete.
+    """
+
+    # Randomization radii applied to object positions at each reset.
     BOOK_RANDOMIZATION_RADIUS = 0.02
-    BOOK_RANDOMIZATION_RADIUS_NOISE = 0.04
     BOOKEND_RANDOMIZATION_RADIUS = 0.01
+    # Additional noise amplitude (reserved for future use).
+    BOOK_RANDOMIZATION_RADIUS_NOISE = 0.04
     BOOKEND_RANDOMIZATION_RADIUS_NOISE = 0.02
 
     def __init__(self):
+        """Create the task scene and its success checker."""
         self.book_name = os.environ.get('BOOK_NAME', 'book')
         self.bookend_name = os.environ.get('BOOKEND_NAME', 'bookend')
         self.table_name = os.environ.get('TABLE_NAME', 'kitchen_table')
@@ -63,19 +74,25 @@ class PassBook:
 
 
 class Checker:
-    PLACE_THRESHOLD_MIN = 0.15  # Minimum distance to `book2` for the placement stage.
-    PLACE_THRESHOLD_MAX = 0.2  # Maximum distance to `book2` for the placement stage.
-    HEIGHT_MIN = 0.8  # Minimum valid placement height.
-    HEIGHT_MAX = 0.88  # Maximum valid placement height.
-    GRIPPER_THRESHOLD = 0.20  # Maximum gripper width for a valid grasp.
+    """Success checker for the PassBook task."""
+
+    # Minimum xy distance between the book and the bookend at placement.
+    PLACE_THRESHOLD_MIN = 0.15
+    # Maximum xy distance between the book and the bookend at placement.
+    PLACE_THRESHOLD_MAX = 0.2
+    # Valid placement height range (world-frame z).
+    HEIGHT_MIN = 0.8
+    HEIGHT_MAX = 0.88
+    # Maximum end-effector-to-object distance that still counts as grasped.
+    GRIPPER_THRESHOLD = 0.2
 
     def __init__(self, book_name, bookend_name):
-        """Initialize the checker for the book placement task."""
+        """Initialize the checker with the scene object names."""
         self.book_name = book_name
         self.bookend_name = bookend_name
 
     def check_gripper(self, env, hand='left'):
-        """Check whether the gripper is holding the object."""
+        """Check whether the specified gripper is close enough to grasp the book."""
         return check_gripper(
             env,
             object_name=self.book_name,
@@ -84,7 +101,7 @@ class Checker:
         )
 
     def check(self, env):
-        """Check whether the book satisfies the placement conditions."""
+        """Return ``True`` if the book is placed at the correct height and distance."""
         book = env.world.scene.get_object(self.book_name)
         bookend = env.world.scene.get_object(self.bookend_name)
         if book is None or bookend is None:
@@ -97,7 +114,7 @@ class Checker:
 
         distance_xy = np.linalg.norm(book_pos[:2] - bookend_pos[:2])
 
-        # The placement must satisfy both height and distance checks.
+        # A valid placement must satisfy both the height and the distance check.
         height_check = self.HEIGHT_MIN <= book_height <= self.HEIGHT_MAX
         distance_check = (self.PLACE_THRESHOLD_MIN <= distance_xy <=
                           self.PLACE_THRESHOLD_MAX)

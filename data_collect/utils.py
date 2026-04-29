@@ -1,7 +1,4 @@
-"""Shared utilities for data collection.
-
-Provides HDF5 file I/O and coordinate transform helpers.
-"""
+"""Shared utilities for data collection scripts."""
 
 import os
 from typing import Any, Dict

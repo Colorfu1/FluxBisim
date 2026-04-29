@@ -1,3 +1,11 @@
+"""Data-collection script for the RotatePitcherLid task.
+
+The left arm holds the pitcher steady while the right arm picks up the lid,
+places it on top of the pitcher, and rotates the wrist to screw it on.
+``(observation, action)`` pairs are recorded into an HDF5 file for each
+successful episode.
+"""
+
 from omni.isaac.kit import SimulationApp
 
 sim_app = SimulationApp({'headless': False})
@@ -25,7 +33,14 @@ from envs import IsaacsimEnv  # noqa: E402
 def setup_controllers(
     env: IsaacsimEnv,
 ) -> Tuple[LeftArmPickController, RightArmPickRotateController]:
-    """Set up controllers for the left and right arms."""
+    """Build and return the scripted controllers for both arms.
+
+    Args:
+        env: Active Isaac Sim environment.
+
+    Returns:
+        A tuple ``(left_controller, right_controller)`` ready for data collection.
+    """
     left_events_dt = [
         0.008, 0.008, 0.5, 0.2, 0.04, 0.004, 0.004, 0.2, 0.008, 0.008
     ]
@@ -56,7 +71,19 @@ def collect_episode_data(
     pitcher_name: str,
     lid_name: str,
 ) -> Dict[str, Any]:
-    """Collect data for a single episode with dual-arm collaboration."""
+    """Run a single episode with dual-arm collaboration and record the data.
+
+    Args:
+        env: Active Isaac Sim environment.
+        left_controller: Scripted left-arm pick controller (holds the pitcher).
+        right_controller: Scripted right-arm pick-and-rotate controller.
+        pitcher_name: Scene object name of the pitcher.
+        lid_name: Scene object name of the lid.
+
+    Returns:
+        A dict with two parallel lists under the keys ``'states'`` and
+        ``'actions'``.
+    """
     obs = env.step()
 
     episode_data = {'states': [], 'actions': []}
@@ -64,12 +91,14 @@ def collect_episode_data(
     cnt = 0
     sample_step = 1
 
+    # Left-arm waypoints: approach and stabilise the pitcher body.
     left_picking_position = np.array(obs[pitcher_name]['pos']) + np.array(
         [-0.088, 0.0, 0.0])
     left_placing_position = np.array(obs[pitcher_name]['pos']) + np.array(
         [0.0, 0.2, 0.0])
     left_target_orientation = euler_angles_to_quat(np.array([0, np.pi / 2, 0]))
 
+    # Right-arm waypoints: pick the lid and place it on top of the pitcher.
     right_picking_position = np.array(obs[lid_name]['pos']) + np.array(
         [-0.01, 0.01, 0.065])
     right_placing_position = np.array(obs[pitcher_name]['pos']) + np.array(
@@ -81,6 +110,7 @@ def collect_episode_data(
         left_event = left_controller.get_current_event()
         right_event = right_controller.get_current_event()
 
+        # Abort the episode early when the right gripper loses the lid.
         if right_event in [4, 5, 6, 7]:
             if not env.task.checker.check_gripper(env):
                 print('The gripper is not holding the object.')
@@ -100,6 +130,8 @@ def collect_episode_data(
             end_effector_offset=np.array([0.0, 0.0, 0.07]),
         )
 
+        # The left arm only needs to act during its first few phases; after
+        # that it stays put while the right arm finishes the rotation.
         if left_event < 4:
             left_actions = left_controller.forward(
                 picking_position=left_picking_position,
@@ -114,6 +146,7 @@ def collect_episode_data(
         else:
             obs = env.step([None, right_actions])
 
+        # Clamp gripper joints while the respective arm should hold something.
         if left_event in [3]:
             obs['piper']['dof_pos']['llink7'] = 0.0
             obs['piper']['dof_pos']['llink8'] = 0.0
@@ -131,6 +164,7 @@ def collect_episode_data(
 
 
 def main():
+    """Parse CLI arguments, run the collection loop and save successful episodes."""
     parser = argparse.ArgumentParser()
     parser.add_argument('--env', type=str, default='apartmentshort')
     parser.add_argument('--config',
@@ -146,6 +180,7 @@ def main():
     with open(cfg_path, 'r', encoding='utf-8') as file:
         config = yaml.safe_load(file)
 
+    # Populate task-specific environment variables consumed by the task class.
     table_name = f"{args.env}_table"
     os.environ['TABLE_NAME'] = table_name
     base_name = f"base_{args.env}"
@@ -161,6 +196,7 @@ def main():
     max_demo = config.get('max_demo', 100)
     episodes = []
 
+    # Let the simulator settle before starting the first episode.
     for i in range(60):
         env.world.step(render=True)
 

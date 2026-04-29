@@ -1,3 +1,5 @@
+"""Task-specific controllers organized by task module."""
+
 from .close_box import \
     LeftArmPickPlaceController as CloseBoxLeftArmPickPlaceController
 from .close_box import RightArmCloseBoxController as RightArmCloseBoxController

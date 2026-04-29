@@ -1,3 +1,5 @@
+"""Task package: task definitions and success checkers."""
+
 from .close_box import CloseBox as CloseBox
 from .pass_book import PassBook as PassBook
 from .pick_place_fruit import PickPlaceFruit as PickPlaceFruit

@@ -1,3 +1,5 @@
+"""Dual-arm robot wrapper built on top of Isaac Sim manipulators."""
+
 import os
 
 import numpy as np
@@ -10,8 +12,18 @@ from scipy.spatial.transform import Rotation as R
 
 
 class BaseRobot:
+    """Dual-arm robot composed of a base prim and two :class:`SingleManipulator`.
+
+    The robot configuration is read from ``cfg/robots.yaml``. Each arm owns a
+    parallel gripper with a closed and opened joint configuration.
+    """
 
     def __init__(self, name):
+        """Initialize the robot descriptor.
+
+        Args:
+            name: Robot identifier used as a prim-path prefix (e.g. ``"piper"``).
+        """
         self.robot_cfg = self._load_robot_config()
         self.name = name
         self.base_name = os.environ.get('BASE_NAME', 'base_kitchen')
@@ -19,6 +31,7 @@ class BaseRobot:
         self.right_manipulator = None
 
     def _load_robot_config(self):
+        """Load and return the full robot configuration YAML."""
         cfg_path = os.path.join(os.path.dirname(__file__), 'cfg',
                                 'robots.yaml')
         with open(cfg_path, 'r', encoding='utf-8') as file:
@@ -26,16 +39,15 @@ class BaseRobot:
         return config
 
     def init_robot(self, world):
-        """Initialize the robot and create its ``XFormPrim`` instances."""
+        """Spawn the robot base and both manipulators into ``world.scene``."""
         if self.robot_cfg is None:
             raise ValueError(f"Configuration for '{self.name}' was not found.")
 
-        # Add the robot base.
+        # Add the robot base prim.
         if self.base_name in self.robot_cfg:
             base_cfg = self.robot_cfg[self.base_name]
             add_reference_to_stage(usd_path=base_cfg['usd_path'],
                                    prim_path=f"/World/{self.name}_base")
-            # Support base position, orientation, and relative delta.
             base_position = np.array(base_cfg.get('position', [0.0, 0.0, 0.0]))
             base_orientation = np.array(
                 base_cfg.get('orientation', [1.0, 0.0, 0.0, 0.0]))
@@ -52,21 +64,17 @@ class BaseRobot:
                 usd_path=left_arm_cfg['usd_path'],
                 prim_path=f"/World/{self.name}_left_arm",
             )
-            # Compute the arm pose in the world frame.
+            # Arm pose in the config is given relative to the robot base.
             left_arm_relative_pos = np.array(left_arm_cfg['position'])
             left_arm_relative_quat = np.array(left_arm_cfg['orientation'])
 
-            # Transform the relative pose into the world frame.
-            base_rot = R.from_quat(base_orientation[[
-                1, 2, 3, 0
-            ]])  # Convert [w,x,y,z] to scipy order [x,y,z,w].
+            # Convert base quaternion from [w, x, y, z] to scipy's [x, y, z, w].
+            base_rot = R.from_quat(base_orientation[[1, 2, 3, 0]])
             left_arm_world_pos = base_position + base_rot.apply(
                 left_arm_relative_pos)
-            left_arm_world_quat = (
-                base_rot *
-                R.from_quat(left_arm_relative_quat[[1, 2, 3, 0]])).as_quat()[[
-                    3, 0, 1, 2
-                ]]  # Convert back to [w,x,y,z] order.
+            # Rotate relative orientation and convert back to [w, x, y, z].
+            left_arm_world_quat = (base_rot * R.from_quat(
+                left_arm_relative_quat[[1, 2, 3, 0]])).as_quat()[[3, 0, 1, 2]]
 
             _ = XFormPrim(
                 prim_paths_expr=f"/World/{self.name}_left_arm",
@@ -100,21 +108,14 @@ class BaseRobot:
                 usd_path=right_arm_cfg['usd_path'],
                 prim_path=f"/World/{self.name}_right_arm",
             )
-            # Compute the arm pose in the world frame.
             right_arm_relative_pos = np.array(right_arm_cfg['position'])
             right_arm_relative_quat = np.array(right_arm_cfg['orientation'])
 
-            # Transform the relative pose into the world frame.
-            base_rot = R.from_quat(base_orientation[[
-                1, 2, 3, 0
-            ]])  # Convert [w,x,y,z] to scipy order [x,y,z,w].
+            base_rot = R.from_quat(base_orientation[[1, 2, 3, 0]])
             right_arm_world_pos = base_position + base_rot.apply(
                 right_arm_relative_pos)
-            right_arm_world_quat = (
-                base_rot *
-                R.from_quat(right_arm_relative_quat[[1, 2, 3, 0]])).as_quat()[[
-                    3, 0, 1, 2
-                ]]  # Convert back to [w,x,y,z] order.
+            right_arm_world_quat = (base_rot * R.from_quat(
+                right_arm_relative_quat[[1, 2, 3, 0]])).as_quat()[[3, 0, 1, 2]]
 
             _ = XFormPrim(
                 prim_paths_expr=f"/World/{self.name}_right_arm",
@@ -146,6 +147,7 @@ class BaseRobot:
         world.scene.add(self.right_manipulator)
 
     def reset(self):
+        """Reset both arms to a randomized home pose with an opened gripper."""
         noise = np.random.uniform(-0.1, 0.1, 6)
         left_joints = np.array(
             [-0.2, 0.3491, -0.3491, 0.0, 0.1, 0.0, 0.035, -0.035])
@@ -164,6 +166,14 @@ class BaseRobot:
             self.right_manipulator.gripper.joint_opened_positions)
 
     def apply_action(self, action):
+        """Apply the given actions to the left and right manipulators.
+
+        Args:
+            action: A sequence of length 1 or 2. A length-2 sequence applies
+                ``action[0]`` to the left arm and ``action[1]`` to the right
+                arm (either entry may be ``None`` to skip that arm). A
+                length-1 sequence applies ``action[0]`` to the right arm only.
+        """
         if len(action) > 1:
             if action[0] is not None:
                 self.left_manipulator.apply_action(action[0])

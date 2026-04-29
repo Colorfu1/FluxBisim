@@ -1,3 +1,10 @@
+"""Data-collection script for the CloseBox task.
+
+The left arm picks the nut and drops it into the box; the right arm then
+pushes the box lid closed. ``(observation, action)`` pairs from both phases
+are recorded into an HDF5 file for each successful episode.
+"""
+
 from omni.isaac.kit import SimulationApp
 
 sim_app = SimulationApp({'headless': False})
@@ -26,7 +33,14 @@ from envs import IsaacsimEnv  # noqa: E402
 def setup_controllers(
     env: IsaacsimEnv,
 ) -> Tuple[LeftArmPickPlaceController, RightArmCloseBoxController]:
-    """Set up controllers for the left and right arms."""
+    """Build and return the scripted controllers for both arms.
+
+    Args:
+        env: Active Isaac Sim environment.
+
+    Returns:
+        A tuple ``(left_controller, right_controller)`` ready for data collection.
+    """
     left_events_dt = [
         0.008, 0.005, 0.5, 0.2, 0.008, 0.004, 0.008, 0.4, 0.008, 0.008
     ]
@@ -55,7 +69,19 @@ def collect_episode_data(
     nut_name: str,
     box_name: str,
 ) -> Dict[str, Any]:
-    """Collect data for a single episode with dual-arm collaboration."""
+    """Run a single episode with dual-arm collaboration and record the data.
+
+    Args:
+        env: Active Isaac Sim environment.
+        left_controller: Scripted left-arm pick-and-place controller.
+        right_controller: Scripted right-arm close-box controller.
+        nut_name: Scene object name of the nut to pick.
+        box_name: Scene object name of the target box.
+
+    Returns:
+        A dict with two parallel lists under the keys ``'states'`` and
+        ``'actions'``.
+    """
     obs = env.step()
 
     episode_data = {'states': [], 'actions': []}
@@ -63,13 +89,16 @@ def collect_episode_data(
     cnt = 0
     sample_step = 1
 
+    # Left-arm waypoints: pick the nut and drop it into the box.
     left_picking_position = np.array(obs[nut_name]['pos']) + np.array(
-        [0.0, 0.0, 0.03])  # np.array([0.0, 0.0, 0.02])
+        [0.0, 0.0, 0.03])
     left_placing_position = np.array(obs[box_name]['pos']) + np.array(
         [0.10, 0.10, 0.05])
     left_target_orientation = euler_angles_to_quat(
         np.array([0.0, np.pi, np.pi / 2]))
 
+    # Right-arm waypoints are defined in the robot base frame so that they
+    # follow the robot around different scene setups.
     door_handle_picking_relative = np.array([0.67123, -0.05, 1.18])
     door_handle_closing_relative = np.array([0.67123, 0.15, 1.18])
     right_picking_position = relative_to_world_position(
@@ -79,10 +108,11 @@ def collect_episode_data(
     right_target_orientation = euler_angles_to_quat(
         np.array([0.0, np.pi, np.pi / 2]))
 
-    # Phase 1: the left arm picks the nut and places it in the box
+    # Phase 1: the left arm picks the nut and drops it into the box.
     while not left_controller.is_done():
         event = left_controller.get_current_event()
 
+        # Abort the episode early when the left gripper loses the nut.
         if event in [4, 5, 6]:
             if not env.task.checker.check_gripper(env):
                 print('The gripper is not holding the object.')
@@ -104,6 +134,7 @@ def collect_episode_data(
 
         obs = env.step([left_actions, None])
 
+        # Clamp the left-arm gripper joints while the nut should be grasped.
         if event in [3, 4, 5, 6]:
             obs['piper']['dof_pos']['llink7'] = 0.0
             obs['piper']['dof_pos']['llink8'] = 0.0
@@ -114,6 +145,7 @@ def collect_episode_data(
 
         cnt += 1
 
+    # Phase 2: the right arm pushes the lid closed.
     while not right_controller.is_done():
         event = right_controller.get_current_event()
 
@@ -133,6 +165,7 @@ def collect_episode_data(
 
         obs = env.step([None, right_actions])
 
+        # Clamp the right-arm gripper joints while the handle should be grasped.
         if event in [3, 4]:
             obs['piper']['dof_pos']['rlink7'] = 0.0
             obs['piper']['dof_pos']['rlink8'] = 0.0
@@ -147,6 +180,7 @@ def collect_episode_data(
 
 
 def main():
+    """Parse CLI arguments, run the collection loop and save successful episodes."""
     parser = argparse.ArgumentParser()
     parser.add_argument('--env', type=str, default='industry')
     parser.add_argument('--config', type=str, default='box_close_config.yaml')
@@ -160,6 +194,7 @@ def main():
     with open(cfg_path, 'r', encoding='utf-8') as file:
         config = yaml.safe_load(file)
 
+    # Populate task-specific environment variables consumed by the task class.
     table_name = f"{args.env}_table"
     os.environ['TABLE_NAME'] = table_name
     base_name = f"base_{args.env}"
@@ -175,6 +210,7 @@ def main():
     max_demo = config.get('max_demo', 100)
     episodes = []
 
+    # Let the simulator settle before starting the first episode.
     for _ in range(60):
         env.world.step(render=True)
 

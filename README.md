@@ -1,4 +1,4 @@
-# limx_bench
+# FluxBisim
 
 本项目基于 `Isaac Sim 4.5.0`，提供单臂/双臂操作任务的数据采集脚本与控制器实现，当前支持的操作系统为 `Ubuntu 20.04`。
 
@@ -52,13 +52,13 @@ benchmark_python <python_file_name>
 
 ```bash
 git clone <your-repo-url>
-cd limx_bench
+cd FluxBisim
 ```
 
 仓库结构如下：
 
 ```text
-limx_bench
+FluxBisim
 ├── assets          # 场景、机器人、物体相关资产
 ├── controllers     # 机械臂运动控制器程序
 ├── data_collect    # 任务数据采集脚本
@@ -136,7 +136,7 @@ benchmark_python data_collect/close_box/box_close_collect.py \
 
 可选配置：
 
-- `close_box_config.yaml`
+- `box_close_config.yaml`
 
 #### 抽屉抽拉（客厅）
 

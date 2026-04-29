@@ -1,3 +1,10 @@
+"""Evaluation entry point for Isaac Sim with a ROS bridge.
+
+Launches Isaac Sim in headless mode, bridges observations/actions between the
+simulator and a VLA policy over ROS, and runs a configurable number of
+evaluation episodes for a given task.
+"""
+
 from omni.isaac.kit import SimulationApp
 
 sim_app = SimulationApp({'headless': True})
@@ -23,7 +30,8 @@ from isaacsim.core.utils.types import ArticulationAction  # noqa: E402
 
 from envs import IsaacsimEnv  # noqa: E402
 
-# (config_yaml_key, env_var_name, default_value) for each task type.
+# Per-task environment variables derived from the config.
+# Each entry is a list of tuples: (config_yaml_key, env_var_name, default_value).
 TASK_ENV_VAR_MAP = {
     'PickPlaceFruit': [
         ('fruit', 'FRUIT_NAME', 'banana'),
@@ -47,6 +55,7 @@ TASK_ENV_VAR_MAP = {
     ],
 }
 
+# Mapping from internal camera names to ROS topic prefixes.
 CAMERA_NAME_TO_TOPIC = {
     'left_cam': 'camera_l',
     'right_cam': 'camera_r',
@@ -55,7 +64,12 @@ CAMERA_NAME_TO_TOPIC = {
 
 
 class IsaacSimROSBridge:
-    """Bridge between Isaac Sim and ROS for evaluation."""
+    """Bridge between Isaac Sim and ROS for policy evaluation.
+
+    The bridge publishes camera images and joint states, subscribes to arm
+    action commands, applies them in the simulator and tracks task completion
+    across multiple episodes.
+    """
 
     def __init__(
         self,
@@ -65,6 +79,15 @@ class IsaacSimROSBridge:
         save_images: bool,
         chunk_size: int,
     ):
+        """Initialize the ROS node, the Isaac Sim environment and IO buffers.
+
+        Args:
+            config_path: Path to the YAML config describing the task and cameras.
+            max_steps: Maximum simulation steps allowed per episode.
+            num_episodes: Total number of episodes to evaluate.
+            save_images: If True, save head-camera frames to disk.
+            chunk_size: Number of actions contained in one VLA action chunk.
+        """
         rospy.init_node('isaacsim_ros_bridge', anonymous=True)
         self.rate = rospy.Rate(10)
 
@@ -82,6 +105,7 @@ class IsaacSimROSBridge:
         self.env = IsaacsimEnv(self.config)
         self.env.reset()
 
+        # Warm up the simulator so that rendered frames are stable.
         for _ in range(60):
             self.env.world.step(render=True)
 
@@ -100,6 +124,7 @@ class IsaacSimROSBridge:
         self._setup_publishers()
         self._setup_subscribers()
 
+        # Pending commands keyed by action index inside the current chunk.
         self.pending_joint_commands = {}
         self.current_chunk_id = None
         self.executed_chunk_actions = 0
@@ -114,6 +139,7 @@ class IsaacSimROSBridge:
     # ------------------------------------------------------------------
 
     def _setup_publishers(self):
+        """Create ROS publishers for images, joint states and control signals."""
         self.image_publishers = {}
         camera_cfg = self.config.get('cameras', {})
         for cam_name in camera_cfg:
@@ -139,6 +165,7 @@ class IsaacSimROSBridge:
                                                     queue_size=1)
 
     def _setup_subscribers(self):
+        """Create ROS subscribers for incoming arm joint commands."""
         self.joint_left_subscriber = rospy.Subscriber(
             '/master/joint_left',
             JointState,
@@ -159,7 +186,7 @@ class IsaacSimROSBridge:
     # ------------------------------------------------------------------
 
     def cleanup(self):
-        """Release all ROS and simulation resources."""
+        """Release all ROS publishers, subscribers and the Isaac Sim environment."""
         try:
             rospy.loginfo('Cleaning up bridge resources ...')
 
@@ -216,6 +243,7 @@ class IsaacSimROSBridge:
 
     @staticmethod
     def _ensure_uint8(image: np.ndarray) -> np.ndarray:
+        """Convert an arbitrary image array to a contiguous ``uint8`` array."""
         if image.dtype != np.uint8:
             if image.max() <= 1.0:
                 image = (image * 255).astype(np.uint8)
@@ -226,7 +254,7 @@ class IsaacSimROSBridge:
         return image
 
     def publish_images(self, obs, timestamp=None):
-        """Publish RGB images from all cameras."""
+        """Publish RGB images from every configured camera."""
         if timestamp is None:
             timestamp = rospy.Time.now()
 
@@ -246,7 +274,7 @@ class IsaacSimROSBridge:
                 rospy.logwarn(traceback.format_exc())
 
     def save_head_cam_image(self, obs):
-        """Save the head camera image to disk (if enabled)."""
+        """Save the head-camera frame to disk when image saving is enabled."""
         if not self.save_images:
             return
 
@@ -275,7 +303,17 @@ class IsaacSimROSBridge:
 
     def _create_joint_state_msg(self, joint_names, dof_pos, timestamp,
                                 frame_id):
-        """Build a JointState message from dof_pos dict."""
+        """Build a ``JointState`` message from a ``dof_pos`` dictionary.
+
+        Args:
+            joint_names: Names of joints to include, in publication order.
+            dof_pos: Mapping from joint name to joint position (radians).
+            timestamp: ROS timestamp to stamp the message with.
+            frame_id: Frame ID to attach to the message header.
+
+        Returns:
+            A populated :class:`sensor_msgs.msg.JointState` instance.
+        """
         joint_state = JointState()
         joint_state.header = Header()
         joint_state.header.stamp = timestamp
@@ -290,7 +328,7 @@ class IsaacSimROSBridge:
                 continue
             joint_state.name.append(joint_name)
 
-            # link7 gripper conversion: publish (link7 - link8) * 0.1 / 0.07
+            # Publish the gripper opening as (link7 - link8) * 0.1 / 0.07.
             if joint_name.endswith('link7'):
                 link8_name = joint_name.replace('link7', 'link8')
                 if link8_name in dof_pos:
@@ -308,7 +346,7 @@ class IsaacSimROSBridge:
         return joint_state
 
     def publish_joint_states(self, obs, timestamp=None):
-        """Publish left and right arm joint states."""
+        """Publish left- and right-arm joint states extracted from ``obs``."""
         try:
             if timestamp is None:
                 timestamp = rospy.Time.now()
@@ -339,17 +377,23 @@ class IsaacSimROSBridge:
             rospy.logwarn(traceback.format_exc())
 
     def publish_chunk_done(self, chunk_id):
-        """Notify the operator that the current action chunk is complete."""
+        """Notify the policy that a given action chunk has been fully executed."""
         msg = Int32()
         msg.data = int(chunk_id)
         self.chunk_done_publisher.publish(msg)
 
     # ------------------------------------------------------------------
-    # Joint state subscription
+    # Joint-state subscription
     # ------------------------------------------------------------------
 
     def _process_joint_callback(self, msg, arm_name, arm_key):
-        """Decode incoming joint command and buffer it by action index."""
+        """Decode an incoming joint command and buffer it by action index.
+
+        Args:
+            msg: Incoming :class:`sensor_msgs.msg.JointState` message.
+            arm_name: Human-readable arm name used in log messages.
+            arm_key: Dictionary key (``'left'`` or ``'right'``) used for buffering.
+        """
         try:
             if len(msg.position) < 7:
                 rospy.logwarn(f"{arm_name} joint count insufficient")
@@ -359,8 +403,8 @@ class IsaacSimROSBridge:
                 rospy.logwarn(f"{arm_name} message missing frame_id")
                 return
 
-            # frame_id carries "chunk_id:action_idx" because ROS1 overwrites
-            # header.seq with its own auto-increment counter.
+            # ``frame_id`` carries "chunk_id:action_idx" because ROS1 overwrites
+            # ``header.seq`` with its own auto-increment counter.
             parts = msg.header.frame_id.split(':')
             if len(parts) != 2:
                 rospy.logwarn(f"{arm_name} unexpected frame_id format: "
@@ -388,7 +432,7 @@ class IsaacSimROSBridge:
             joint_positions = np.zeros(8)
             joint_positions[:6] = msg.position[:6]
 
-            # Inverse gripper conversion: link7 = published * 0.07 / 0.2
+            # Inverse gripper conversion: link7 = published * 0.07 / 0.2.
             joint_positions[6] = msg.position[6] * 0.07 / 0.2
             joint_positions[7] = -joint_positions[6]
 
@@ -400,9 +444,11 @@ class IsaacSimROSBridge:
             rospy.logwarn(traceback.format_exc())
 
     def _joint_left_callback(self, msg):
+        """ROS callback for left-arm joint commands."""
         self._process_joint_callback(msg, 'left arm', 'left')
 
     def _joint_right_callback(self, msg):
+        """ROS callback for right-arm joint commands."""
         self._process_joint_callback(msg, 'right arm', 'right')
 
     # ------------------------------------------------------------------
@@ -410,10 +456,12 @@ class IsaacSimROSBridge:
     # ------------------------------------------------------------------
 
     def apply_received_joint_states(self):
-        """Apply the next joint command from the active chunk.
+        """Apply the next joint command from the active action chunk.
 
         Returns:
-            (action_applied, chunk_completed, completed_chunk_id)
+            A tuple ``(action_applied, chunk_completed, completed_chunk_id)``,
+            where ``completed_chunk_id`` is the ID of the finished chunk or
+            ``None`` when the chunk is still in progress.
         """
         try:
             if self.current_chunk_id is None:
@@ -459,10 +507,11 @@ class IsaacSimROSBridge:
             return False, False, None
 
     # ------------------------------------------------------------------
-    # Environment reset & task check
+    # Environment reset and task check
     # ------------------------------------------------------------------
 
     def _flush_joint_queues(self):
+        """Drop any buffered joint commands and reset chunk bookkeeping."""
         self.pending_joint_commands.clear()
         self.current_chunk_id = None
         self.executed_chunk_actions = 0
@@ -499,7 +548,7 @@ class IsaacSimROSBridge:
             rospy.logerr(traceback.format_exc())
 
     def check_task_completion(self):
-        """Return True if the current task checker reports success."""
+        """Return ``True`` if the current task checker reports success."""
         try:
             if hasattr(self.env, 'task') and hasattr(self.env.task, 'checker'):
                 return self.env.task.checker.check(self.env)
@@ -513,7 +562,12 @@ class IsaacSimROSBridge:
     # ------------------------------------------------------------------
 
     def print_statistics(self, success_list, task_completion_steps):
-        """Print evaluation statistics."""
+        """Log episode-level evaluation statistics.
+
+        Args:
+            success_list: Boolean list of episode outcomes.
+            task_completion_steps: Step counts of successfully completed episodes.
+        """
         if not success_list:
             rospy.logwarn('No statistics to display')
             return
@@ -546,7 +600,7 @@ class IsaacSimROSBridge:
     # ------------------------------------------------------------------
 
     def run(self):
-        """Run the evaluation loop."""
+        """Run the evaluation loop until the episode budget is exhausted."""
         rospy.loginfo(f"Starting evaluation: max_steps={self.max_steps}, "
                       f"num_episodes={self.num_episodes}")
 
@@ -642,13 +696,14 @@ class IsaacSimROSBridge:
 
 
 def signal_handler(sig, frame):
+    """Gracefully shut down ROS when a termination signal is received."""
     rospy.loginfo(f"Received signal {sig}, shutting down ...")
     if not rospy.is_shutdown():
         rospy.signal_shutdown('Signal received')
 
 
 def cleanup_resources(bridge=None):
-    """Clean up all resources (bridge, ROS, Isaac Sim)."""
+    """Clean up the bridge, ROS node and the Isaac Sim application."""
     rospy.loginfo('Cleaning up resources ...')
 
     if bridge is not None:
@@ -673,7 +728,7 @@ def cleanup_resources(bridge=None):
 
 
 def setup_task_env_vars(config):
-    """Set task-specific environment variables based on the config."""
+    """Populate task-specific environment variables based on the config."""
     task_name = config.get('task')
     if task_name not in TASK_ENV_VAR_MAP:
         rospy.logwarn(f"Unknown task '{task_name}', skipping task env vars. "
@@ -687,6 +742,7 @@ def setup_task_env_vars(config):
 
 
 def main():
+    """Parse CLI arguments and run the evaluation loop."""
     parser = argparse.ArgumentParser(
         description='Isaac Sim & ROS evaluation script')
     parser.add_argument(

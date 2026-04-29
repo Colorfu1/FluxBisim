@@ -1,3 +1,5 @@
+"""RotatePitcherLid task: place the pitcher lid on the pitcher in the target orientation."""
+
 import os
 
 import numpy as np
@@ -12,12 +14,21 @@ from tasks.utils import get_prim_world_pos  # noqa: E402
 
 
 class RotatePitcherLid:
+    """Scene definition for the RotatePitcherLid task.
+
+    Holds the scene objects (pitcher, lid, table) and a :class:`Checker`
+    instance that decides when the task is complete.
+    """
+
+    # Randomization radii applied at each reset.
     PITCHER_RANDOMIZATION_RADIUS = 0.005
-    PITCHER_RANDOMIZATION_RADIUS_NOISE = 0.01
     LID_RANDOMIZATION_RADIUS = 0.02
+    # Additional noise amplitude (reserved for future use).
+    PITCHER_RANDOMIZATION_RADIUS_NOISE = 0.01
     LID_RANDOMIZATION_RADIUS_NOISE = 0.04
 
     def __init__(self):
+        """Create the task scene and its success checker."""
         self.pitcher_name = os.environ.get('PITCHER_NAME', 'pitcher')
         self.lid_name = os.environ.get('LID_NAME', 'pitcherlid')
         self.table_name = os.environ.get('TABLE_NAME', 'kitchen_table')
@@ -31,7 +42,7 @@ class RotatePitcherLid:
                                pitcher_name=self.pitcher_name)
 
     def randomize_objects_position(self):
-        """Randomize the pitcher and lid around their initial poses."""
+        """Randomize object positions around their initial poses."""
         for obj in self.objects:
             if obj.name == self.pitcher_name:
                 default_position = generate_point_in_circle(
@@ -65,19 +76,27 @@ class RotatePitcherLid:
 
 
 class Checker:
+    """Success checker for the RotatePitcherLid task."""
+
+    # Maximum xy distance between the lid and the pitcher opening.
     PLACE_THRESHOLD = 0.015
+    # Maximum orientation difference (degrees) between the lid and the target pose.
     ORIENTATION_THRESHOLD_DEG = 5.0
+    # Target lid orientation quaternion ``[w, x, y, z]``.
     TARGET_LID_QUAT = np.array([0.77, 0.00303, -0.00313, 0.64])
+    # End-effector offsets used by gripper checks (kept for reference).
     RIGHT_EE_OFFSET = np.array([-0.01, 0.0, -0.17])
     LEFT_EE_OFFSET = np.array([0.413, 0.03, -0.14])
+    # Maximum end-effector-to-object distance that still counts as grasped.
     GRIPPER_THRESHOLD = 0.2
 
     def __init__(self, lid_name, pitcher_name):
+        """Initialize the checker with the scene object names."""
         self.lid_name = lid_name
         self.pitcher_name = pitcher_name
 
     def check_gripper(self, env):
-        """Check whether the gripper is holding the object."""
+        """Check whether the right gripper is close enough to grasp the lid."""
         return check_gripper(
             env,
             object_name=self.lid_name,
@@ -86,7 +105,7 @@ class Checker:
         )
 
     def check(self, env):
-        """Check whether the lid is at the pitcher opening with the desired pose."""
+        """Return ``True`` once the lid sits on the pitcher with the desired pose."""
         lid = env.world.scene.get_object(self.lid_name)
         pitcher = env.world.scene.get_object(self.pitcher_name)
         if lid is None or pitcher is None:
@@ -104,7 +123,8 @@ class Checker:
             lid_q = lid_orient / np.linalg.norm(lid_orient)
             target_q = self.TARGET_LID_QUAT / np.linalg.norm(
                 self.TARGET_LID_QUAT)
-            # Use absolute dot product to treat q and -q as the same rotation.
+            # Use the absolute dot product so that q and -q are treated as the
+            # same rotation.
             dot = float(np.clip(np.abs(np.dot(lid_q, target_q)), -1.0, 1.0))
             angle_diff_deg = np.degrees(2.0 * np.arccos(dot))
         else:

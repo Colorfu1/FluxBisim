@@ -1,3 +1,5 @@
+"""PickPlaceFruit task: pick a fruit off the table and place it on a plate."""
+
 import os
 
 import numpy as np
@@ -10,10 +12,19 @@ from tasks.utils import check_gripper, generate_point_in_circle  # noqa: E402
 
 
 class PickPlaceFruit:
-    RANDOMIZATION_RADIUS = 0.04
+    """Scene definition for the PickPlaceFruit task.
+
+    Holds the scene objects (fruit, plate, table) and a :class:`Checker`
+    instance that decides when the task is complete.
+    """
+
+    # Randomization radius applied to the fruit and plate at each reset.
+    RANDOMIZATION_RADIUS = 0.03
+    # Additional noise amplitude (reserved for future use).
     RANDOMIZATION_RADIUS_NOISE = 0.06
 
     def __init__(self):
+        """Create the task scene and its success checker."""
         self.fruit_name = os.environ.get('FRUIT_NAME', 'banana')
         self.plate_name = os.environ.get('PLATE_NAME', 'plate')
         self.table_name = os.environ.get('TABLE_NAME', 'kitchen_table')
@@ -52,15 +63,20 @@ class PickPlaceFruit:
 
 
 class Checker:
+    """Success checker for the PickPlaceFruit task."""
+
+    # Maximum xy distance between the fruit and the plate for a successful place.
     PLACE_THRESHOLD_MIN = 0.06
-    GRIPPER_THRESHOLD = 0.15
+    # Maximum end-effector-to-object distance that still counts as grasped.
+    GRIPPER_THRESHOLD = 0.1
 
     def __init__(self, fruit_name, plate_name):
+        """Initialize the checker with the scene object names."""
         self.fruit_name = fruit_name
         self.plate_name = plate_name
 
     def check_gripper(self, env):
-        """Check whether the gripper is holding the object."""
+        """Check whether the right gripper is close enough to grasp the fruit."""
         return check_gripper(
             env,
             object_name=self.fruit_name,
@@ -69,7 +85,7 @@ class Checker:
         )
 
     def check(self, env):
-        """Check whether the object is at the target position."""
+        """Return ``True`` once the fruit is on the plate and the gripper is released."""
         fruit = env.world.scene.get_object(self.fruit_name)
         plate = env.world.scene.get_object(self.plate_name)
         if fruit is None or plate is None:
@@ -80,6 +96,6 @@ class Checker:
 
         distance_xy = np.linalg.norm(fruit_pos[:2] - plate_pos[:2])
 
+        # Task succeeds when the fruit is on the plate and no longer grasped.
         return (distance_xy <= self.PLACE_THRESHOLD_MIN
-                and not self.check_gripper(env)
-                )  # The position threshold can be tuned if needed.
+                and not self.check_gripper(env))

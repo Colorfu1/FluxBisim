@@ -1,3 +1,5 @@
+"""Isaac Sim environment wrapper driving a task, a robot and cameras."""
+
 import math
 import os
 from importlib import import_module
@@ -13,8 +15,15 @@ from .robots import BaseRobot  # noqa: E402
 
 
 class IsaacsimEnv:
+    """High-level Isaac Sim environment.
+
+    Instantiates the task class referenced in the configuration, sets up the
+    simulation world, adds the robot, objects and cameras, and exposes a
+    minimal ``reset`` / ``step`` / ``get_observation`` API.
+    """
 
     def __init__(self, cfg):
+        """Build the environment from a parsed YAML configuration dictionary."""
         self.cfg = cfg
         self.cameras = []
         self.task_name = None
@@ -24,12 +33,13 @@ class IsaacsimEnv:
         self._setup_environment()
 
     def init_objects(self):
+        """Spawn the task environment and all task-related objects."""
         # The environment USD is placed at the world origin.
         self.task.environment.init_object(self.world, np.array([0.0, 0.0,
                                                                 0.0]),
                                           np.array([1.0, 0.0, 0.0, 0.0]))
 
-        # Retrieve the robot base pose.
+        # Resolve the robot base pose from the current configuration.
         base_position = None
         base_orientation = None
 
@@ -46,7 +56,7 @@ class IsaacsimEnv:
             obj.init_object(self.world, base_position, base_orientation)
 
     def init_cameras(self):
-        """Initialize cameras defined in the configuration."""
+        """Initialize all cameras defined in the configuration."""
         self.cameras = []
         camera_cfg = self.cfg.get('cameras')
         if not camera_cfg:
@@ -65,45 +75,43 @@ class IsaacsimEnv:
                 camera_axes='usd',
             )
             camera.initialize()
-            # camera.set_focal_length(cam['focal_length']/10.0)
-            # camera.set_clipping_range(0.05, 1000.0)
 
             fx, fy, cx, cy = cam['intrinsics']
             width, height = cam['width'], cam['height']
 
-            # Calculate camera parameters
+            # Translate pinhole intrinsics to Isaac Sim sensor parameters.
+            # The sensor pixel size is fixed at 3 micrometres in this setup.
             horizontal_aperture = 3 * 1e-3 * width
             vertical_aperture = 3 * 1e-3 * height
             focal_length_x = fx * 3 * 1e-3
             focal_length_y = fy * 3 * 1e-3
-            focal_length = (focal_length_x +
-                            focal_length_y) / 2  # The focal length in mm
+            focal_length = (focal_length_x + focal_length_y) / 2
 
-            # Set the camera parameters, note the unit conversion between Isaac Sim sensor and Kit
-            camera.set_focal_length(
-                focal_length /
-                10.0)  # Convert from mm to cm (or 1/10th of a world unit)
-            camera.set_focus_distance(0.3)  # The focus distance in meters
-            camera.set_lens_aperture(
-                2.0 * 100.0)  # Convert the f-stop to Isaac Sim units
-            camera.set_horizontal_aperture(
-                horizontal_aperture /
-                10.0)  # Convert from mm to cm (or 1/10th of a world unit)
+            # Isaac Sim expects focal length and apertures in units of cm.
+            camera.set_focal_length(focal_length / 10.0)
+            # Focus distance is in meters.
+            camera.set_focus_distance(0.3)
+            # f-stop is expressed in Isaac Sim units (f-number times 100).
+            camera.set_lens_aperture(2.0 * 100.0)
+            camera.set_horizontal_aperture(horizontal_aperture / 10.0)
             camera.set_vertical_aperture(vertical_aperture / 10.0)
+            # Clipping range is in meters.
             camera.set_clipping_range(0.01, 1.0e2)
 
-            # Set the distortion coefficients, this is necessary, when cx, cy are not in the center of the image
+            # Configure a rational polynomial projection so that off-center
+            # principal points (cx, cy) are respected. Distortion coefficients
+            # are zero to keep the image undistorted.
             diagonal = 2 * math.sqrt(
                 max(cx, width - cx)**2 + max(cy, height - cy)**2)
             diagonal_fov = 2 * math.atan2(diagonal, fx + fy) * 180 / math.pi
             camera.set_projection_type('fisheyePolynomial')
-            # D=np.zeros((8)): disable distortion coefficients.
             camera.set_rational_polynomial_properties(width, height, cx, cy,
                                                       diagonal_fov,
                                                       np.zeros((8)))
             self.cameras.append(camera)
 
     def _setup_environment(self):
+        """Create the world, task, robot and all scene assets."""
         self.task_name = self.cfg.get('task')
 
         module = import_module('tasks')
@@ -121,6 +129,7 @@ class IsaacsimEnv:
         self.init_cameras()
 
     def reset(self):
+        """Reset the simulation world, cameras, task objects and the robot."""
         self.world.reset()
 
         for cam in self.cameras:
@@ -131,9 +140,19 @@ class IsaacsimEnv:
         self.robot.reset()
 
     def apply_action(self, action):
+        """Forward an action to the underlying dual-arm robot."""
         self.robot.apply_action(action)
 
     def get_robot_pos(self, robot1, robot2):
+        """Return the joint-position dictionary for both arms.
+
+        Args:
+            robot1: Left manipulator whose joints become ``llink1..llink8``.
+            robot2: Right manipulator whose joints become ``rlink1..rlink8``.
+
+        Returns:
+            A dictionary of the form ``{'dof_pos': {<joint_name>: <pos>}}``.
+        """
         dof_pos = {}
         dof_poses = (robot1.get_joint_positions().tolist() +
                      robot2.get_joint_positions().tolist())
@@ -146,6 +165,7 @@ class IsaacsimEnv:
         return {'dof_pos': dof_pos}
 
     def get_observation(self):
+        """Collect the current observation (camera frames, object and robot poses)."""
         obs = {}
         # Make sure the cameras have been initialized before reading frames.
         if not self.cameras:
@@ -169,6 +189,7 @@ class IsaacsimEnv:
         return obs
 
     def step(self, action=None):
+        """Apply an action (optional) and return the updated observation."""
         if action is not None:
             self.apply_action(action)
             self.world.step(render=True)

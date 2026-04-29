@@ -1,3 +1,5 @@
+"""Controllers for the PassBook task."""
+
 import typing
 
 import numpy as np
@@ -10,26 +12,28 @@ from controllers.motion import RMPFlowController
 
 
 def _mix_sin(t):
+    """Smooth-step interpolation weight in ``[0, 1]`` for ``t`` in ``[0, 1]``."""
     return 0.5 * (1 - np.cos(t * np.pi))
 
 
 def _combine_convex(a, b, alpha):
+    """Return the convex combination ``(1 - alpha) * a + alpha * b``."""
     return (1 - alpha) * a + alpha * b
 
 
 class LeftArmPickPlaceController(BaseController):
-    """
-    A pick and place state machine for the left arm.
+    """Left-arm pick-and-place state machine that hands a book over.
 
-    Each phase runs for 1 second, which is the internal time of the state machine.
-    Dt of each phase/event step is defined separately.
+    Each phase runs for 1 second of internal state-machine time; the ``dt`` of
+    each phase is specified separately via ``events_dt``.
 
-    - Phase 0: Move end_effector above the object.
-    - Phase 1: Lower end_effector down to the grasping height.
-    - Phase 2: Wait for Robot's inertia to settle.
-    - Phase 3: Close gripper.
-    - Phase 4: Lift the object upward.
-    - Phase 5: Move end_effector toward the handover position.
+    - Phase 0: Move end-effector above the object.
+    - Phase 1: Lower end-effector down to the grasping height.
+    - Phase 2: Wait for the arm's inertia to settle.
+    - Phase 3: Close the gripper.
+    - Phase 4: Lift the object upward while slerping the end-effector
+      orientation from the picking orientation to the handover orientation.
+    - Phase 5: Move end-effector toward the handover position.
     """
 
     def __init__(
@@ -40,6 +44,16 @@ class LeftArmPickPlaceController(BaseController):
         events_dt: typing.Optional[typing.List[float]] = None,
         end_effector_initial_height: typing.Optional[float] = None,
     ) -> None:
+        """Initialize the left-arm pick-and-place state machine.
+
+        Args:
+            name: Controller name.
+            robot_articulation: Articulation of the left arm.
+            gripper: Parallel gripper on the left arm.
+            events_dt: Per-phase time increments (length up to 6).
+            end_effector_initial_height: Initial end-effector height; defaults
+                to ``1.1`` when ``None``.
+        """
         if events_dt is None:
             events_dt = [0.01, 0.01, 1, 0.03, 0.08, 0.01]
 
@@ -70,12 +84,15 @@ class LeftArmPickPlaceController(BaseController):
         return
 
     def is_paused(self) -> bool:
+        """Return whether the state machine is currently paused."""
         return self._pause
 
     def get_current_event(self) -> int:
+        """Return the index of the currently-active phase."""
         return self._event
 
     def _get_alpha(self):
+        """Return the xy-interpolation weight for the current phase."""
         if self._event < 5:
             return 0
         elif self._event == 5:
@@ -84,6 +101,7 @@ class LeftArmPickPlaceController(BaseController):
             raise ValueError()
 
     def _get_interpolated_xy(self, target_x, target_y, current_x, current_y):
+        """Interpolate between the current xy and the target xy."""
         alpha = self._get_alpha()
         xy_target = _combine_convex(
             np.array([current_x, current_y]),
@@ -93,6 +111,7 @@ class LeftArmPickPlaceController(BaseController):
         return xy_target
 
     def _get_target_hs(self, target_height):
+        """Return the target end-effector height for the current phase."""
         if self._event == 0:
             h = self._h1
         elif self._event == 1:
@@ -108,6 +127,7 @@ class LeftArmPickPlaceController(BaseController):
 
     def _get_interpolated_orientation(self, picking_orientation,
                                       placing_orientation):
+        """Slerp between the picking and placing orientations."""
         if self._event <= 3:
             return picking_orientation
         elif self._event == 4:
@@ -134,6 +154,19 @@ class LeftArmPickPlaceController(BaseController):
         picking_orientation: typing.Optional[np.ndarray] = None,
         placing_orientation: typing.Optional[np.ndarray] = None,
     ) -> ArticulationAction:
+        """Advance the state machine by one step and return the next action.
+
+        Args:
+            picking_position: World-frame xyz of the book grasping pose.
+            placing_position: World-frame xyz of the handover target pose.
+            current_joint_positions: Current joint positions of the left arm.
+            end_effector_offset: Offset added to the target position.
+            picking_orientation: Desired end-effector orientation during picking.
+            placing_orientation: Desired end-effector orientation during handover.
+
+        Returns:
+            An :class:`ArticulationAction` for the current step.
+        """
         if end_effector_offset is None:
             end_effector_offset = np.array([0, 0, 0])
 
@@ -185,6 +218,13 @@ class LeftArmPickPlaceController(BaseController):
         end_effector_initial_height: typing.Optional[float] = None,
         events_dt: typing.Optional[typing.List[float]] = None,
     ) -> None:
+        """Reset the state machine and its underlying cspace controller.
+
+        Args:
+            end_effector_initial_height: Optional override for the approach
+                height; the previous value is kept when ``None``.
+            events_dt: Optional override for the per-phase time increments.
+        """
         BaseController.reset(self)
         self._cspace_controller.reset()
         self._event = 0
@@ -206,37 +246,40 @@ class LeftArmPickPlaceController(BaseController):
         return
 
     def is_done(self) -> bool:
+        """Return whether the state machine has finished all phases."""
         if self._event >= len(self._events_dt):
             return True
         else:
             return False
 
     def pause(self) -> None:
+        """Pause the state machine; subsequent forwards will emit no-ops."""
         self._pause = True
         return
 
     def resume(self) -> None:
+        """Resume the state machine after a previous ``pause`` call."""
         self._pause = False
         return
 
 
 class RightArmPickPlaceController(BaseController):
-    """
-    A pick and place state machine for passing a book with the right arm.
+    """Right-arm state machine that receives the book and places it on the bookend.
 
-    Each phase runs for 1 second, which is the internal time of the state machine.
-    Dt of each phase/event step is defined separately.
+    Each phase runs for 1 second of internal state-machine time; the ``dt`` of
+    each phase is specified separately via ``events_dt``.
 
-    - Phase 0: Move end_effector above the handover position at the 'end_effector_initial_height'.
-    - Phase 1: Lower end_effector down to the grasping height.
-    - Phase 2: Wait for Robot's inertia to settle.
-    - Phase 3: Close gripper.
+    - Phase 0: Move end-effector above the handover position at the initial height.
+    - Phase 1: Lower end-effector down to the grasping height.
+    - Phase 2: Wait for the arm's inertia to settle.
+    - Phase 3: Close the gripper.
     - Phase 4: Hold position and wait for stabilization.
     - Phase 5: Lift the book vertically to a safe height above the placing position.
-    - Phase 6: Move horizontally toward the placing position while switching to the placing orientation.
+    - Phase 6: Move horizontally toward the placing position while switching
+      to the placing orientation.
     - Phase 7: Lower the book to the placing height.
-    - Phase 8: Open gripper to release the book at the placing height.
-    - Phase 9: Move end_effector above the placing position at the 'end_effector_initial_height'.
+    - Phase 8: Open the gripper to release the book.
+    - Phase 9: Move end-effector back above the placing position.
     """
 
     def __init__(
@@ -247,6 +290,16 @@ class RightArmPickPlaceController(BaseController):
         events_dt: typing.Optional[typing.List[float]] = None,
         end_effector_initial_height: typing.Optional[float] = None,
     ) -> None:
+        """Initialize the right-arm pick-and-place state machine.
+
+        Args:
+            name: Controller name.
+            robot_articulation: Articulation of the right arm.
+            gripper: Parallel gripper on the right arm.
+            events_dt: Per-phase time increments (length up to 10).
+            end_effector_initial_height: Initial end-effector height; defaults
+                to ``1.1`` when ``None``.
+        """
         if events_dt is None:
             events_dt = [
                 0.008, 0.008, 1, 0.03, 0.01, 0.01, 0.01, 0.01, 0.1, 0.008
@@ -278,12 +331,15 @@ class RightArmPickPlaceController(BaseController):
         self._pause = False
 
     def is_paused(self) -> bool:
+        """Return whether the state machine is currently paused."""
         return self._pause
 
     def get_current_event(self) -> int:
+        """Return the index of the currently-active phase."""
         return self._event
 
     def _get_alpha(self):
+        """Return the xy-interpolation weight for the current phase."""
         if self._event <= 5:
             return 0
         elif self._event == 6:
@@ -294,6 +350,7 @@ class RightArmPickPlaceController(BaseController):
             raise ValueError()
 
     def _get_interpolated_xy(self, target_x, target_y, current_x, current_y):
+        """Interpolate between the current xy and the target xy."""
         alpha = self._get_alpha()
         xy_target = _combine_convex(
             np.array([current_x, current_y]),
@@ -303,6 +360,7 @@ class RightArmPickPlaceController(BaseController):
         return xy_target
 
     def _get_target_hs(self, target_height):
+        """Return the target end-effector height for the current phase."""
         if self._event == 0:
             h = self._h1
         elif self._event == 1:
@@ -331,6 +389,20 @@ class RightArmPickPlaceController(BaseController):
         picking_orientation: typing.Optional[np.ndarray] = None,
         placing_orientation: typing.Optional[np.ndarray] = None,
     ) -> ArticulationAction:
+        """Advance the state machine by one step and return the next action.
+
+        Args:
+            picking_position: World-frame xyz of the handover pose where the
+                right arm receives the book.
+            placing_position: World-frame xyz of the placing pose on the bookend.
+            current_joint_positions: Current joint positions of the right arm.
+            end_effector_offset: Offset added to the target position.
+            picking_orientation: Desired end-effector orientation during picking.
+            placing_orientation: Desired end-effector orientation during placing.
+
+        Returns:
+            An :class:`ArticulationAction` for the current step.
+        """
         if end_effector_offset is None:
             end_effector_offset = np.array([0, 0, 0])
         if self._pause or self.is_done():
@@ -383,11 +455,20 @@ class RightArmPickPlaceController(BaseController):
         end_effector_initial_height: typing.Optional[float] = None,
         events_dt: typing.Optional[typing.List[float]] = None,
     ) -> None:
-        BaseController.reset(
-            self,
-            end_effector_initial_height=end_effector_initial_height,
-            events_dt=None,
-        )
+        """Reset the state machine and its underlying cspace controller.
+
+        Args:
+            end_effector_initial_height: Optional override for the approach
+                height; the previous value is kept when ``None``.
+            events_dt: Optional override for the per-phase time increments.
+        """
+        BaseController.reset(self)
+        self._cspace_controller.reset()
+        self._event = 0
+        self._t = 0
+        if end_effector_initial_height is not None:
+            self._h1 = end_effector_initial_height
+        self._pause = False
         if events_dt is not None:
             self._events_dt = events_dt
             if not isinstance(self._events_dt, np.ndarray) and not isinstance(
@@ -401,15 +482,18 @@ class RightArmPickPlaceController(BaseController):
                     'events dt length must be less than or equal to 10')
 
     def is_done(self) -> bool:
+        """Return whether the state machine has finished all phases."""
         if self._event >= len(self._events_dt):
             return True
         else:
             return False
 
     def pause(self) -> None:
+        """Pause the state machine; subsequent forwards will emit no-ops."""
         self._pause = True
         return
 
     def resume(self) -> None:
+        """Resume the state machine after a previous ``pause`` call."""
         self._pause = False
         return

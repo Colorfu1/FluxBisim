@@ -1,3 +1,11 @@
+"""Data-collection script for the PassBook task.
+
+The left arm first picks the book from the table and moves it to a handover
+position; the right arm then grasps the book from the left gripper, moves it
+over the bookend, and places it down. ``(observation, action)`` pairs from both
+phases are recorded into an HDF5 file for each successful episode.
+"""
+
 from omni.isaac.kit import SimulationApp
 
 sim_app = SimulationApp({'headless': False})
@@ -27,7 +35,14 @@ from envs import IsaacsimEnv  # noqa: E402
 def setup_controllers(
     env: IsaacsimEnv,
 ) -> Tuple[LeftArmPickPlaceController, RightArmPickPlaceController]:
-    """Set up controllers for the left and right arms."""
+    """Build and return the scripted controllers for both arms.
+
+    Args:
+        env: Active Isaac Sim environment.
+
+    Returns:
+        A tuple ``(left_controller, right_controller)`` ready for data collection.
+    """
     left_events_dt = [0.01, 0.01, 0.5, 0.05, 0.05, 0.01]
     right_events_dt = [
         0.008, 0.008, 0.5, 0.03, 0.01, 0.01, 0.01, 0.01, 0.05, 0.02
@@ -55,7 +70,24 @@ def compute_left_arm_move_action(
     move_state: Dict[str, Any],
     target_orientation: np.ndarray,
 ) -> ArticulationAction:
-    """Compute the action for moving the left arm to a target position."""
+    """Compute a step of the left arm's retreat motion using a sine-smoothed path.
+
+    The motion interpolates between the arm's current end-effector position
+    and ``move_state['target_position']`` over ``[0, 1]`` with a cosine
+    smoothing curve; ``move_state['progress']`` is advanced each step by
+    ``move_state['dt']`` until it reaches ``1.0``. The gripper stays open
+    throughout the retreat.
+
+    Args:
+        env: Active Isaac Sim environment.
+        left_controller: Scripted left-arm controller (its cspace controller
+            is reused for IK).
+        move_state: Mutable dictionary tracking the motion progress.
+        target_orientation: End-effector orientation kept during the retreat.
+
+    Returns:
+        An :class:`ArticulationAction` for the left arm at the current step.
+    """
     target_position = move_state['target_position']
 
     if move_state['progress'] < 1.0:
@@ -88,7 +120,19 @@ def collect_episode_data(
     book_name: str,
     bookend_name: str,
 ) -> Dict[str, Any]:
-    """Collect data for a single episode with dual-arm collaboration."""
+    """Run a single episode with dual-arm collaboration and record the data.
+
+    Args:
+        env: Active Isaac Sim environment.
+        left_controller: Scripted left-arm pick controller.
+        right_controller: Scripted right-arm pick-and-place controller.
+        book_name: Scene object name of the book.
+        bookend_name: Scene object name of the bookend.
+
+    Returns:
+        A dict with two parallel lists under the keys ``'states'`` and
+        ``'actions'``.
+    """
     obs = env.step()
 
     episode_data = {'states': [], 'actions': []}
@@ -96,6 +140,7 @@ def collect_episode_data(
     cnt = 0
     sample_step = 1
 
+    # Left-arm waypoints: pick the book and bring it to the handover pose.
     picking_position_1 = np.array(obs[book_name]['pos']) + np.array(
         [-0.01, 0.0, -0.14])
     handover_position_1 = relative_to_world_position(
@@ -104,10 +149,11 @@ def collect_episode_data(
     handover_orientation_1 = euler_angles_to_quat(
         np.array([0.0, np.pi / 2, 0.0]))
 
-    # Phase 1: the left arm performs the pick action
+    # Phase 1: the left arm picks the book and carries it to the handover pose.
     while not left_controller.is_done():
         event = left_controller.get_current_event()
 
+        # Abort the episode early when the left gripper loses the book.
         if event in [3, 4, 5]:
             if not env.task.checker.check_gripper(env, hand='left'):
                 print('The gripper is not holding the object.')
@@ -130,6 +176,7 @@ def collect_episode_data(
 
         obs = env.step([left_action_1, None])
 
+        # Clamp the left-arm gripper joints while the book should be grasped.
         if event in [3, 4, 5]:
             obs['piper']['dof_pos']['llink7'] = 0.0
             obs['piper']['dof_pos']['llink8'] = 0.0
@@ -140,8 +187,10 @@ def collect_episode_data(
 
         cnt += 1
 
+    # Remember the last left-arm action so the arm keeps its handover pose.
     last_left_action = left_action_1
 
+    # State machine tracking the left-arm retreat during phase 2.
     left_move_state = {
         'started': False,
         'progress': 0.0,
@@ -150,8 +199,9 @@ def collect_episode_data(
         'target_position': None,
     }
 
-    # Phase 2: the right arm performs pick-and-place while the left arm
-    # releases the object and moves away after the right arm grasps it
+    # Phase 2: the right arm picks from the handover and places on the bookend;
+    # once the right arm closes its gripper (event 3 -> next), the left arm
+    # releases and retreats via :func:`compute_left_arm_move_action`.
     last_event = -1
 
     picking_position_2 = np.array(obs[book_name]['pos']) + np.array(
@@ -163,6 +213,7 @@ def collect_episode_data(
     placing_orientation_2 = euler_angles_to_quat(
         np.array([0.0, 3 * np.pi / 4, np.pi / 2]))
 
+    # Target retreat position (well to the left and slightly behind the book).
     move_position = np.array(obs[book_name]['pos']) + np.array(
         [-0.5, 0.1, -0.165])
     _, move_orientation = env.robot.left_manipulator.end_effector.get_world_pose(
@@ -171,6 +222,7 @@ def collect_episode_data(
     while not right_controller.is_done():
         event = right_controller.get_current_event()
 
+        # Abort the episode early when the right gripper loses the book.
         if event in [3, 4, 5, 6, 7]:
             if not env.task.checker.check_gripper(env, hand='right'):
                 print('The gripper is not holding the object.')
@@ -180,6 +232,8 @@ def collect_episode_data(
             state = extract_state_from_obs(obs)
             episode_data['states'].append(state)
 
+        # Trigger the left-arm retreat right after the right arm has closed
+        # its gripper (transition out of phase 3).
         if last_event == 3 and event != last_event:
             current_left_position, _ = (
                 env.robot.left_manipulator.end_effector.get_world_pose())
@@ -210,6 +264,7 @@ def collect_episode_data(
                 target_orientation=move_orientation,
             )
 
+            # Once the retreat is complete, lock the left arm in place.
             if left_move_state['progress'] >= 1.0:
                 last_left_action = left_actions_2
                 left_move_state['started'] = False
@@ -218,6 +273,7 @@ def collect_episode_data(
 
         obs = env.step([left_actions_2, right_actions_2])
 
+        # Clamp gripper joints while the respective arm should hold the book.
         if event in [0, 1, 2, 3]:
             obs['piper']['dof_pos']['llink7'] = 0.0
             obs['piper']['dof_pos']['llink8'] = 0.0
@@ -235,6 +291,7 @@ def collect_episode_data(
 
 
 def main():
+    """Parse CLI arguments, run the collection loop and save successful episodes."""
     parser = argparse.ArgumentParser()
     parser.add_argument('--env', type=str, default='apartment')
     parser.add_argument('--config', type=str, default='book_pass_config.yaml')
@@ -248,6 +305,7 @@ def main():
     with open(cfg_path, 'r', encoding='utf-8') as file:
         config = yaml.safe_load(file)
 
+    # Populate task-specific environment variables consumed by the task class.
     table_name = f"{args.env}_table"
     os.environ['TABLE_NAME'] = table_name
     base_name = f"base_{args.env}"
@@ -263,6 +321,7 @@ def main():
     max_demo = config.get('max_demo', 100)
     episodes = []
 
+    # Let the simulator settle before starting the first episode.
     for i in range(60):
         env.world.step(render=True)
 

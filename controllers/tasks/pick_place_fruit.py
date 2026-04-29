@@ -1,3 +1,5 @@
+"""Controller for the PickPlaceFruit task."""
+
 import typing
 
 import numpy as np
@@ -9,18 +11,19 @@ from controllers.motion import RMPFlowController
 
 
 class PickPlaceFruitController(manipulators_controllers.PickPlaceController):
-    """
-    Pick and place controller without the final retreat-to-old-xy phase.
+    """Pick-and-place controller without the final retreat-to-old-xy phase.
 
-    - Phase 0: Move end_effector above the cube center at the 'end_effector_initial_height'.
-    - Phase 1: Lower end_effector down to encircle the target cube
-    - Phase 2: Wait for Robot's inertia to settle.
-    - Phase 3: close grip.
-    - Phase 4: Move end_effector up again, keeping the grip tight (lifting the block).
-    - Phase 5: Smoothly move the end_effector toward the goal xy, keeping the height constant.
-    - Phase 6: Move end_effector vertically toward goal height at the 'end_effector_initial_height'.
-    - Phase 7: loosen the grip.
-    - Phase 8: Move end_effector vertically up again at the 'end_effector_initial_height'.
+    The state machine progresses through the following phases:
+
+    - Phase 0: Move end-effector above the picking position at the initial height.
+    - Phase 1: Lower end-effector down to the grasping height.
+    - Phase 2: Wait for the arm's inertia to settle.
+    - Phase 3: Close the gripper.
+    - Phase 4: Lift the object upward, keeping the gripper closed.
+    - Phase 5: Move horizontally toward the placing xy position.
+    - Phase 6: Lower the end-effector toward the placing height.
+    - Phase 7: Open the gripper to release the object.
+    - Phase 8: Lift the end-effector back to the initial height.
     """
 
     def __init__(
@@ -29,8 +32,17 @@ class PickPlaceFruitController(manipulators_controllers.PickPlaceController):
         gripper: ParallelGripper,
         robot_articulation: SingleArticulation,
         events_dt=None,
-        end_effector_initial_height: float = 0.9,
+        end_effector_initial_height: float = 1.0,
     ) -> None:
+        """Initialize the fruit pick-and-place state machine.
+
+        Args:
+            name: Controller name.
+            gripper: Parallel gripper used to grasp the fruit.
+            robot_articulation: Articulation of the manipulating arm.
+            events_dt: Per-phase time increments (must have length 9).
+            end_effector_initial_height: Height used for the approach phases.
+        """
         if events_dt is None:
             events_dt = [
                 0.008, 0.008, 0.5, 0.2, 0.008, 0.004, 0.008, 0.4, 0.008
@@ -54,6 +66,13 @@ class PickPlaceFruitController(manipulators_controllers.PickPlaceController):
         end_effector_initial_height: typing.Optional[float] = None,
         events_dt: typing.Optional[typing.List[float]] = None,
     ) -> None:
+        """Reset the state machine.
+
+        Args:
+            end_effector_initial_height: Optional override for the approach height.
+            events_dt: Optional override for the per-phase time increments
+                (must have length 9 when provided).
+        """
         if events_dt is not None:
             if not isinstance(events_dt, np.ndarray) and not isinstance(
                     events_dt, list):

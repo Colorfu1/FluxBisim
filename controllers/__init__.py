@@ -1,3 +1,5 @@
+"""Controllers package: motion generation and task-specific state machines."""
+
 from .motion import RMPFlowController as RMPFlowController
 from .tasks.close_box import \
     LeftArmPickPlaceController as CloseBoxLeftArmPickPlaceController
