@@ -10,16 +10,8 @@ from isaacsim.robot.manipulators import controllers as manipulators_controllers
 from isaacsim.robot.manipulators.grippers import ParallelGripper
 
 from controllers.motion import RMPFlowController
-
-
-def _mix_sin(t):
-    """Smooth-step interpolation weight in ``[0, 1]`` for ``t`` in ``[0, 1]``."""
-    return 0.5 * (1 - np.cos(t * np.pi))
-
-
-def _combine_convex(a, b, alpha):
-    """Return the convex combination ``(1 - alpha) * a + alpha * b``."""
-    return (1 - alpha) * a + alpha * b
+from controllers.tasks.utils import (combine_convex, mix_sin,
+                                     normalize_events_dt)
 
 
 class LeftArmPickPlaceController(manipulators_controllers.PickPlaceController):
@@ -136,15 +128,7 @@ class RightArmPullPushController(BaseController):
         if self._h1 is None:
             self._h1 = 0.9
         self._h0 = None
-        self._events_dt = events_dt
-
-        if not isinstance(self._events_dt, np.ndarray) and not isinstance(
-                self._events_dt, list):
-            raise Exception('events dt need to be list or numpy array')
-        elif isinstance(self._events_dt, np.ndarray):
-            self._events_dt = self._events_dt.tolist()
-        if len(self._events_dt) > 9:
-            raise Exception('events dt length must be less than or equal to 9')
+        self._events_dt = normalize_events_dt(events_dt, max_length=9)
 
         self._cspace_controller = cspace_controller
         self._gripper = gripper
@@ -164,7 +148,7 @@ class RightArmPullPushController(BaseController):
         if self._event < 4:
             return 0
         elif self._event in [4, 6]:
-            return _mix_sin(self._t)
+            return mix_sin(self._t)
         elif self._event == 8:
             return 1.0
         else:
@@ -183,18 +167,18 @@ class RightArmPullPushController(BaseController):
         else:
             start = np.array([current_x, current_y])
             end = np.array([target_x, target_y])
-        return _combine_convex(start, end, alpha)
+        return combine_convex(start, end, alpha)
 
     def _get_target_hs(self):
         """Return the target end-effector height for the current phase."""
         if self._event == 0:
             h = self._h1
         elif self._event == 1:
-            h = _combine_convex(self._h1, self._h0, _mix_sin(self._t))
+            h = combine_convex(self._h1, self._h0, mix_sin(self._t))
         elif self._event in [4, 6]:
             h = self._h0
         elif self._event == 8:
-            h = _combine_convex(self._h0, self._h1, _mix_sin(self._t))
+            h = combine_convex(self._h0, self._h1, mix_sin(self._t))
         else:
             raise ValueError()
         return h
@@ -286,16 +270,7 @@ class RightArmPullPushController(BaseController):
             self._h1 = end_effector_initial_height
         self._pause = False
         if events_dt is not None:
-            self._events_dt = events_dt
-            if not isinstance(self._events_dt, np.ndarray) and not isinstance(
-                    self._events_dt, list):
-                raise Exception(
-                    'event velocities need to be list or numpy array')
-            elif isinstance(self._events_dt, np.ndarray):
-                self._events_dt = self._events_dt.tolist()
-            if len(self._events_dt) > 9:
-                raise Exception(
-                    'events dt length must be less than or equal to 9')
+            self._events_dt = normalize_events_dt(events_dt, max_length=9)
         return
 
     def is_done(self) -> bool:

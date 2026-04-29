@@ -10,16 +10,8 @@ from isaacsim.robot.manipulators import controllers as manipulators_controllers
 from isaacsim.robot.manipulators.grippers import ParallelGripper
 
 from controllers.motion import RMPFlowController
-
-
-def _mix_sin(t):
-    """Smooth-step interpolation weight in ``[0, 1]`` for ``t`` in ``[0, 1]``."""
-    return 0.5 * (1 - np.cos(t * np.pi))
-
-
-def _combine_convex(a, b, alpha):
-    """Return the convex combination ``(1 - alpha) * a + alpha * b``."""
-    return (1 - alpha) * a + alpha * b
+from controllers.tasks.utils import (combine_convex, interpolate_xy, mix_sin,
+                                     normalize_events_dt)
 
 
 class LeftArmPickPlaceController(manipulators_controllers.PickPlaceController):
@@ -129,15 +121,7 @@ class RightArmCloseBoxController(BaseController):
         if self._h1 is None:
             self._h1 = 1.2
         self._h0 = None
-        self._events_dt = events_dt
-
-        if not isinstance(self._events_dt, np.ndarray) and not isinstance(
-                self._events_dt, list):
-            raise Exception('events dt need to be list or numpy array')
-        elif isinstance(self._events_dt, np.ndarray):
-            self._events_dt = self._events_dt.tolist()
-        if len(self._events_dt) > 5:
-            raise Exception('events dt length must be less than or equal to 5')
+        self._events_dt = normalize_events_dt(events_dt, max_length=5)
 
         self._cspace_controller = cspace_controller
         self._gripper = gripper
@@ -156,26 +140,21 @@ class RightArmCloseBoxController(BaseController):
         if self._event in [0, 1]:
             return 0
         if self._event == 4:
-            return _mix_sin(self._t)
+            return mix_sin(self._t)
         else:
             raise ValueError()
 
     def _get_interpolated_xy(self, target_x, target_y, current_x, current_y):
         """Interpolate between the current xy and the target xy."""
-        alpha = self._get_alpha()
-        xy_target = _combine_convex(
-            np.array([current_x, current_y]),
-            np.array([target_x, target_y]),
-            alpha,
-        )
-        return xy_target
+        return interpolate_xy(target_x, target_y, current_x, current_y,
+                              self._get_alpha())
 
     def _get_target_height(self):
         """Return the target end-effector height for the current phase."""
         if self._event == 0:
             return self._h1
         if self._event == 1:
-            return _combine_convex(self._h1, self._h0, _mix_sin(self._t))
+            return combine_convex(self._h1, self._h0, mix_sin(self._t))
         if self._event == 4:
             return self._h0
         else:
@@ -266,16 +245,7 @@ class RightArmCloseBoxController(BaseController):
             self._h1 = end_effector_initial_height
         self._pause = False
         if events_dt is not None:
-            self._events_dt = events_dt
-            if not isinstance(self._events_dt, np.ndarray) and not isinstance(
-                    self._events_dt, list):
-                raise Exception(
-                    'event velocities need to be list or numpy array')
-            elif isinstance(self._events_dt, np.ndarray):
-                self._events_dt = self._events_dt.tolist()
-            if len(self._events_dt) > 5:
-                raise Exception(
-                    'events dt length must be less than or equal to 5')
+            self._events_dt = normalize_events_dt(events_dt, max_length=5)
         return
 
     def is_done(self) -> bool:

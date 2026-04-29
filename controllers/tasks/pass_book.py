@@ -9,16 +9,8 @@ from isaacsim.core.utils.types import ArticulationAction
 from isaacsim.robot.manipulators.grippers import ParallelGripper
 
 from controllers.motion import RMPFlowController
-
-
-def _mix_sin(t):
-    """Smooth-step interpolation weight in ``[0, 1]`` for ``t`` in ``[0, 1]``."""
-    return 0.5 * (1 - np.cos(t * np.pi))
-
-
-def _combine_convex(a, b, alpha):
-    """Return the convex combination ``(1 - alpha) * a + alpha * b``."""
-    return (1 - alpha) * a + alpha * b
+from controllers.tasks.utils import (combine_convex, interpolate_xy, mix_sin,
+                                     normalize_events_dt)
 
 
 class LeftArmPickPlaceController(BaseController):
@@ -68,15 +60,7 @@ class LeftArmPickPlaceController(BaseController):
         if self._h1 is None:
             self._h1 = 1.1
         self._h0 = None
-        self._events_dt = events_dt
-
-        if not isinstance(self._events_dt, np.ndarray) and not isinstance(
-                self._events_dt, list):
-            raise Exception('events dt need to be list or numpy array')
-        elif isinstance(self._events_dt, np.ndarray):
-            self._events_dt = self._events_dt.tolist()
-        if len(self._events_dt) > 6:
-            raise Exception('events dt length must be less than or equal to 6')
+        self._events_dt = normalize_events_dt(events_dt, max_length=6)
 
         self._cspace_controller = cspace_controller
         self._gripper = gripper
@@ -96,29 +80,24 @@ class LeftArmPickPlaceController(BaseController):
         if self._event < 5:
             return 0
         elif self._event == 5:
-            return _mix_sin(self._t)
+            return mix_sin(self._t)
         else:
             raise ValueError()
 
     def _get_interpolated_xy(self, target_x, target_y, current_x, current_y):
         """Interpolate between the current xy and the target xy."""
-        alpha = self._get_alpha()
-        xy_target = _combine_convex(
-            np.array([current_x, current_y]),
-            np.array([target_x, target_y]),
-            alpha,
-        )
-        return xy_target
+        return interpolate_xy(target_x, target_y, current_x, current_y,
+                              self._get_alpha())
 
     def _get_target_hs(self, target_height):
         """Return the target end-effector height for the current phase."""
         if self._event == 0:
             h = self._h1
         elif self._event == 1:
-            h = _combine_convex(self._h1, self._h0, _mix_sin(self._t))
+            h = combine_convex(self._h1, self._h0, mix_sin(self._t))
         elif self._event == 4:
-            h = _combine_convex(self._h0, target_height + 0.02,
-                                _mix_sin(self._t))
+            h = combine_convex(self._h0, target_height + 0.02,
+                               mix_sin(self._t))
         elif self._event == 5:
             h = target_height + 0.02
         else:
@@ -131,7 +110,7 @@ class LeftArmPickPlaceController(BaseController):
         if self._event <= 3:
             return picking_orientation
         elif self._event == 4:
-            alpha = _mix_sin(self._t)
+            alpha = mix_sin(self._t)
             dot = np.dot(picking_orientation, placing_orientation)
             dot = np.clip(dot, -1.0, 1.0)
             theta = np.arccos(dot) * alpha
@@ -233,16 +212,7 @@ class LeftArmPickPlaceController(BaseController):
             self._h1 = end_effector_initial_height
         self._pause = False
         if events_dt is not None:
-            self._events_dt = events_dt
-            if not isinstance(self._events_dt, np.ndarray) and not isinstance(
-                    self._events_dt, list):
-                raise Exception(
-                    'event velocities need to be list or numpy array')
-            elif isinstance(self._events_dt, np.ndarray):
-                self._events_dt = self._events_dt.tolist()
-            if len(self._events_dt) > 6:
-                raise Exception(
-                    'events dt length must be less than or equal to 6')
+            self._events_dt = normalize_events_dt(events_dt, max_length=6)
         return
 
     def is_done(self) -> bool:
@@ -315,16 +285,7 @@ class RightArmPickPlaceController(BaseController):
         self._h1 = (end_effector_initial_height
                     if end_effector_initial_height is not None else 1.1)
         self._h0 = None
-        self._events_dt = events_dt
-
-        if not isinstance(self._events_dt, np.ndarray) and not isinstance(
-                self._events_dt, list):
-            raise Exception('events dt need to be list or numpy array')
-        elif isinstance(self._events_dt, np.ndarray):
-            self._events_dt = self._events_dt.tolist()
-        if len(self._events_dt) > 10:
-            raise Exception(
-                'events dt length must be less than or equal to 10')
+        self._events_dt = normalize_events_dt(events_dt, max_length=10)
 
         self._cspace_controller = cspace_controller
         self._gripper = gripper
@@ -343,7 +304,7 @@ class RightArmPickPlaceController(BaseController):
         if self._event <= 5:
             return 0
         elif self._event == 6:
-            return _mix_sin(self._t)
+            return mix_sin(self._t)
         elif self._event in [7, 9]:
             return 1.0
         else:
@@ -351,31 +312,25 @@ class RightArmPickPlaceController(BaseController):
 
     def _get_interpolated_xy(self, target_x, target_y, current_x, current_y):
         """Interpolate between the current xy and the target xy."""
-        alpha = self._get_alpha()
-        xy_target = _combine_convex(
-            np.array([current_x, current_y]),
-            np.array([target_x, target_y]),
-            alpha,
-        )
-        return xy_target
+        return interpolate_xy(target_x, target_y, current_x, current_y,
+                              self._get_alpha())
 
     def _get_target_hs(self, target_height):
         """Return the target end-effector height for the current phase."""
         if self._event == 0:
             h = self._h1
         elif self._event == 1:
-            h = _combine_convex(self._h1, self._h0, _mix_sin(self._t))
+            h = combine_convex(self._h1, self._h0, mix_sin(self._t))
         elif self._event == 5:
-            h = _combine_convex(self._h0, target_height + 0.2,
-                                _mix_sin(self._t))
+            h = combine_convex(self._h0, target_height + 0.2, mix_sin(self._t))
         elif self._event == 6:
             h = target_height + 0.2
         elif self._event == 7:
-            h = _combine_convex(target_height + 0.2, target_height - 0.03,
-                                _mix_sin(self._t))
+            h = combine_convex(target_height + 0.2, target_height - 0.03,
+                               mix_sin(self._t))
         elif self._event == 9:
-            h = _combine_convex(target_height - 0.03, self._h1,
-                                _mix_sin(self._t))
+            h = combine_convex(target_height - 0.03, self._h1,
+                               mix_sin(self._t))
         else:
             raise ValueError()
         return h
@@ -470,16 +425,7 @@ class RightArmPickPlaceController(BaseController):
             self._h1 = end_effector_initial_height
         self._pause = False
         if events_dt is not None:
-            self._events_dt = events_dt
-            if not isinstance(self._events_dt, np.ndarray) and not isinstance(
-                    self._events_dt, list):
-                raise Exception(
-                    'event velocities need to be list or numpy array')
-            elif isinstance(self._events_dt, np.ndarray):
-                self._events_dt = self._events_dt.tolist()
-            if len(self._events_dt) > 10:
-                raise Exception(
-                    'events dt length must be less than or equal to 10')
+            self._events_dt = normalize_events_dt(events_dt, max_length=10)
 
     def is_done(self) -> bool:
         """Return whether the state machine has finished all phases."""
