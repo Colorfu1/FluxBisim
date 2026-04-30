@@ -74,7 +74,7 @@ class Checker:
     # Maximum distance that still counts as "drawer closed".
     MAX_CLOSED_DIST = 0.02
     # Maximum end-effector-to-object distance that still counts as grasped.
-    GRIPPER_THRESHOLD = 0.2
+    GRIPPER_THRESHOLD = 0.1
     # Baseline offset (in metres) subtracted when measuring the drawer opening.
     DRAWER_OFFSET = 0.04646722
 

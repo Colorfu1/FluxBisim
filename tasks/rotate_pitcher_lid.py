@@ -88,7 +88,7 @@ class Checker:
     RIGHT_EE_OFFSET = np.array([-0.01, 0.0, -0.17])
     LEFT_EE_OFFSET = np.array([0.413, 0.03, -0.14])
     # Maximum end-effector-to-object distance that still counts as grasped.
-    GRIPPER_THRESHOLD = 0.2
+    GRIPPER_THRESHOLD = 0.1
 
     def __init__(self, lid_name, pitcher_name):
         """Initialize the checker with the scene object names."""

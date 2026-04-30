@@ -21,10 +21,10 @@ class CloseBox:
     that decides when the task is complete.
     """
 
-    # Randomization radius applied to the nut position at each reset.
-    NUT_RANDOMIZATION_RADIUS = 0.03
+    # Randomization radius applied to the nut and box at each reset.
+    RANDOMIZATION_RADIUS = 0.03
     # Additional noise amplitude (reserved for future use).
-    NUT_RANDOMIZATION_RADIUS_NOISE = 0.06
+    RANDOMIZATION_RADIUS_NOISE = 0.06
 
     def __init__(self):
         """Create the task scene and its success checker."""
@@ -40,14 +40,14 @@ class CloseBox:
         self.checker = Checker(nut_name=self.nut_name, box_name=self.box_name)
 
     def randomize_objects_position(self):
-        """Randomize the nut position while keeping the box fixed."""
+        """Randomize object positions around their initial poses."""
         for obj in self.objects:
-            if obj.name == self.nut_name:
+            if obj.name == self.nut_name or obj.name == self.box_name:
                 default_position = generate_point_in_circle(
                     obj.init_poisition_global[0],
                     obj.init_poisition_global[1],
                     obj.init_poisition_global[2],
-                    radius=self.NUT_RANDOMIZATION_RADIUS,
+                    radius=self.RANDOMIZATION_RADIUS,
                 )
                 obj.object.set_default_state(
                     positions=np.array([default_position]))
@@ -74,7 +74,7 @@ class Checker:
     CLOSE_THRESHOLD_MIN_DEG = 10.0
     CLOSE_THRESHOLD_MAX_DEG = 15.0
     # Maximum end-effector-to-object distance that still counts as grasped.
-    GRIPPER_THRESHOLD = 0.2
+    GRIPPER_THRESHOLD = 0.1
 
     def __init__(self, nut_name, box_name):
         """Initialize the checker with the scene object names."""

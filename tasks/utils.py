@@ -4,9 +4,10 @@ from typing import Sequence
 
 import numpy as np
 from isaacsim.core.prims import XFormPrim
+from scipy.spatial.transform import Rotation as R
 
 # Default offset applied from the gripper base to the grasping point, in metres.
-DEFAULT_EE_OFFSET = (0.0, 0.0, -0.13)
+DEFAULT_EE_OFFSET = (0.0, 0.0, 0.13)
 # Default maximum end-effector-to-object distance that still counts as grasped.
 DEFAULT_GRIPPER_THRESHOLD = 0.1
 
@@ -66,8 +67,8 @@ def check_gripper(
         object_name: Name of the scene object to check against.
         hand: Either ``"left"`` or ``"right"``.
         threshold: Maximum end-effector-to-object distance for a valid grasp.
-        ee_offset: Offset applied to the end-effector pose before the distance
-            measurement.
+        ee_offset: Offset, expressed in the end-effector's local frame, that is
+            rotated into the world frame before the distance measurement.
 
     Returns:
         ``True`` if the distance from the (offset) end-effector to the object
@@ -75,8 +76,15 @@ def check_gripper(
     """
     manipulator = (env.robot.left_manipulator
                    if hand == 'left' else env.robot.right_manipulator)
-    current_ee_pos = manipulator.end_effector.get_world_pose()[0] + np.array(
-        ee_offset)
+    # Isaac Sim returns the EE pose as (position, quaternion) where the
+    # quaternion uses the [w, x, y, z] convention. ``ee_offset`` is defined in
+    # the end-effector's local frame, so it must be rotated by the EE's world
+    # orientation before being added to the EE's world position.
+    ee_pos, ee_quat = manipulator.end_effector.get_world_pose()
+    ee_pos = np.array(ee_pos)
+    ee_quat = np.array(ee_quat)
+    ee_rot = R.from_quat(ee_quat[[1, 2, 3, 0]])
+    current_ee_pos = ee_pos + ee_rot.apply(np.array(ee_offset))
     object_pos = np.array(
         env.world.scene.get_object(object_name).get_world_poses()[0][0])
     return float(np.linalg.norm(current_ee_pos - object_pos)) <= threshold

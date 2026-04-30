@@ -98,13 +98,24 @@ def collect_episode_data(
         np.array([0.0, np.pi, np.pi / 2]))
 
     # Right-arm waypoints are defined in the robot base frame so that they
-    # follow the robot around different scene setups.
+    # follow the robot around different scene setups. Because the box (and
+    # therefore its lid handle) is randomized at each reset, we apply the
+    # box's xy-displacement on top of the base-frame waypoint so the right
+    # arm always tracks the actual handle pose.
     door_handle_picking_relative = np.array([0.67123, -0.05, 1.18])
     door_handle_closing_relative = np.array([0.67123, 0.15, 1.18])
-    right_picking_position = relative_to_world_position(
-        env, door_handle_picking_relative)
-    right_closing_position = relative_to_world_position(
-        env, door_handle_closing_relative)
+
+    box_obj = next(o for o in env.task.objects if o.name == box_name)
+    box_original_world = np.array(box_obj.init_poisition_global)
+    box_current_world = np.array(obs[box_name]['pos'])
+    box_displacement = box_current_world - box_original_world
+
+    right_picking_position = (
+        relative_to_world_position(env, door_handle_picking_relative) +
+        box_displacement)
+    right_closing_position = (
+        relative_to_world_position(env, door_handle_closing_relative) +
+        box_displacement)
     right_target_orientation = euler_angles_to_quat(
         np.array([0.0, np.pi, np.pi / 2]))
 

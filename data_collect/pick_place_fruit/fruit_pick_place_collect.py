@@ -39,7 +39,7 @@ def setup_controllers(
     Returns:
         The right-arm pick-and-place controller used to collect demonstrations.
     """
-    right_events_dt = [0.01, 0.005, 0.5, 0.2, 0.008, 0.005, 0.008, 0.4, 0.008]
+    right_events_dt = [0.008, 0.005, 0.5, 0.2, 0.008, 0.005, 0.008, 0.4, 0.008]
     right_controller = PickPlaceFruitController(
         name='right_controller',
         robot_articulation=env.robot.right_manipulator,
