@@ -32,7 +32,7 @@ class PickPlaceFruitController(manipulators_controllers.PickPlaceController):
         gripper: ParallelGripper,
         robot_articulation: SingleArticulation,
         events_dt=None,
-        end_effector_initial_height: float = 1.2,
+        end_effector_initial_height: float = 0.9,
     ) -> None:
         """Initialize the fruit pick-and-place state machine.
 

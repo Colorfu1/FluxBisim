@@ -42,7 +42,7 @@ def setup_controllers(
         A tuple ``(left_controller, right_controller)`` ready for data collection.
     """
     left_events_dt = [
-        0.01, 0.01, 0.5, 0.2, 0.008, 0.004, 0.008, 0.4, 0.01, 0.01
+        0.01, 0.008, 0.5, 0.2, 0.008, 0.004, 0.008, 0.4, 0.01, 0.01
     ]
     right_events_dt = [0.01, 0.01, 0.5, 0.2, 0.008, 0.1, 0.008, 0.4, 0.01]
 
@@ -91,7 +91,7 @@ def collect_episode_data(
 
     # Left-arm waypoints: pick the object and drop it inside the drawer.
     left_picking_position = np.array(obs[object_name]['pos']) + np.array(
-        [0.0, 0.0, 0.0])
+        [0.0, 0.0, -0.01])
     left_placing_position = np.array(obs[drawer_name]['pos']) + np.array(
         [0.04, -0.08, 0.25])
     left_target_orientation = euler_angles_to_quat(

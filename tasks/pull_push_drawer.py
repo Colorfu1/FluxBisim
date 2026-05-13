@@ -21,9 +21,9 @@ class PullPushDrawer:
     """
 
     # Randomization radius applied to object positions at each reset.
-    RANDOMIZATION_RADIUS = 0.01
+    RANDOMIZATION_RADIUS = 0.02
     # Additional noise amplitude (reserved for future use).
-    RANDOMIZATION_RADIUS_NOISE = 0.02
+    RANDOMIZATION_RADIUS_NOISE = 0.04
 
     def __init__(self):
         """Create the task scene and its success checker."""
