@@ -1,188 +1,182 @@
 # FluxBisim
 
-本项目基于 `Isaac Sim 4.5.0`，提供单臂/双臂操作任务的数据采集脚本与控制器实现，当前支持的操作系统为 `Ubuntu 20.04`。
+`FluxBisim` 是基于 `Isaac Sim 4.5.0` 的机器人操作仿真环境，为 FluxVLA 提供仿真资产、数据采集脚本、控制器和 ROS 评测入口。
 
-## Isaac Sim 4.5.0 安装与环境配置
+## 特性
 
-推荐用户通过 NVIDIA 官方直链下载 `Isaac Sim 4.5.0` 安装包：
+- 支持 `Ubuntu 20.04` + `Isaac Sim 4.5.0`。
+- 覆盖抓取放置、关箱、抽屉推拉、拧杯盖、书本传递等任务。
+- 通过 ROS topic 连接 Isaac Sim 仿真环境与 FluxVLA 推理进程。
+- 作为 `FluxVLA` 仓库下的子目录使用。
 
-[Isaac Sim 4.5.0 Linux x86_64 下载链接](https://download.isaacsim.omniverse.nvidia.com/isaac-sim-standalone-4.5.0-linux-x86_64.zip)
+## 框架图
 
-### 1. 安装 Isaac Sim 4.5.0
+## 安装
 
-请先在 `Ubuntu 20.04` 上下载并解压 `Isaac Sim 4.5.0`。例如：
+### 1. 仓库目录
+
+`FluxBisim` 应放在 `FluxVLA` 仓库目录下：
+
+```text
+FluxVLA/
+├── FluxBisim/
+├── configs/
+├── scripts/
+└── fluxvla/
+```
+
+`FluxBisim` 主要目录如下：
+
+```text
+FluxBisim/
+├── assets/          # 仿真资产
+├── controllers/     # 机器人控制器
+├── data_collect/    # 数据采集脚本
+├── envs/            # 仿真器、机器人和物体配置
+├── tasks/           # 任务逻辑与随机化
+├── evaluate.py      # Isaac Sim 评测入口
+└── fluxbisim_benchmark.sh
+```
+
+### 2. 安装 Isaac Sim
+
+下载并解压 Isaac Sim 4.5.0：
 
 ```bash
 wget https://download.isaacsim.omniverse.nvidia.com/isaac-sim-standalone-4.5.0-linux-x86_64.zip
 unzip isaac-sim-standalone-4.5.0-linux-x86_64.zip -d /path/to/install_dir/
 ```
 
-解压完成后，目录通常类似：
-
-```bash
-/path/to/install_dir/isaac-sim-4.5.0
-```
-
-建议首次启动一次，完成缓存和扩展初始化：
+首次启动一次以初始化缓存和扩展：
 
 ```bash
 cd /path/to/install_dir/isaac-sim-4.5.0
 ./isaac-sim.sh
 ```
 
-### 2. 配置 Isaac Sim 自带 Python 环境
-
-`Isaac Sim` 自带一个定制的 Python 解释器，入口脚本为 `python.sh`。建议在 `~/.bashrc` 中添加别名：
+建议为 Isaac Sim Python 配置别名：
 
 ```bash
-alias benchmark_python="/path/to/install_dir/isaac-sim-4.5.0/python.sh"
-```
-
-配置生效后可以这样使用：
-
-```bash
+echo 'alias benchmark_python="/path/to/install_dir/isaac-sim-4.5.0/python.sh"' >> ~/.bashrc
 source ~/.bashrc
-benchmark_python -c "import isaacsim; print('Isaac Sim Python OK')"
-benchmark_python <python_file_name>
 ```
 
-## 项目安装与运行
+### 3. 安装 ROS Noetic
 
-### 1. 获取本仓库源码
+仿真评测依赖 ROS Noetic：
 
 ```bash
-git clone <your-repo-url>
-cd FluxBisim
+sudo apt update
+sudo apt install ros-noetic-desktop-full ros-noetic-cv-bridge \
+  ros-noetic-sensor-msgs ros-noetic-std-msgs python3-rosdep
+echo "source /opt/ros/noetic/setup.bash" >> ~/.bashrc
+source ~/.bashrc
 ```
 
-仓库结构如下：
+首次安装 ROS 后初始化 `rosdep`：
 
-```text
-FluxBisim
-├── assets          # 场景、机器人、物体相关资产
-├── controllers     # 机械臂运动控制器程序
-├── data_collect    # 任务数据采集脚本
-├── envs            # 仿真器、机器人、物体配置
-└── tasks           # 任务随机化与测评逻辑
+```bash
+sudo rosdep init
+rosdep update
 ```
 
-### 2. 安装本仓库额外依赖
+### 4. 安装 Python 依赖
 
-本项目代码中额外使用了 `rootutils`、`PyYAML`、`h5py`、`scipy` 等 Python 包，建议直接安装到 Isaac Sim 自带环境中：
+依赖安装到 Isaac Sim 自带 Python 环境中：
 
 ```bash
 benchmark_python -m pip install --upgrade pip
 benchmark_python -m pip install rootutils PyYAML h5py scipy
 ```
 
-如果你没有配置别名，也可以直接执行：
+环境检查：
 
 ```bash
-/path/to/install_dir/isaac-sim-4.5.0/python.sh -m pip install rootutils PyYAML h5py scipy
+benchmark_python -c "import isaacsim, rootutils, yaml, h5py, scipy; print('FluxBisim env OK')"
 ```
 
-### 3. 验证环境是否可用
+## 数据采集
 
-在项目根目录执行：
+所有采集脚本均在 `FluxBisim/` 下运行：
 
 ```bash
-benchmark_python -c "import rootutils, yaml, h5py, scipy; print('Python deps OK')"
-benchmark_python -c "import isaacsim; print('Isaac Sim import OK')"
+cd /path/to/FluxVLA/FluxBisim
+benchmark_python <collect_script> --env <env_name> --config <config_name> [--data_path <output_dir>]
 ```
 
-如果两条命令都能正常输出，说明运行环境已经准备完成。
+可用任务：
 
-### 4. 数据采集
+| 任务         | 脚本                                                            | 环境                    | 配置                                                                                                                                                                                                           |
+| ------------ | --------------------------------------------------------------- | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 水果抓取放置 | `data_collect/pick_place_fruit/fruit_pick_place_collect.py`     | `kitchen`, `apartment`  | `apple_pick_place_config.yaml`, `banana_pick_place_config.yaml`, `carrot_pick_place_config.yaml`, `cucumber_pick_place_config.yaml`, `mangosteen_pick_place_config.yaml`, `whiteradish_pick_place_config.yaml` |
+| 关箱         | `data_collect/close_box/box_close_collect.py`                   | `industry`              | `box_close_config.yaml`                                                                                                                                                                                        |
+| 抽屉推拉     | `data_collect/pull_push_drawer/drawer_pull_push_collect.py`     | `apartment`             | `drawer_pull_push_config.yaml`                                                                                                                                                                                 |
+| 拧杯盖       | `data_collect/rotate_pitcher_lid/pitcher_lid_rotate_collect.py` | `apartmentshort`        | `pitcher_lid_rotate_config.yaml`                                                                                                                                                                               |
+| 书本传递     | `data_collect/pass_book/book_pass_collect.py`                   | `apartment`, `industry` | `book_pass_config.yaml`                                                                                                                                                                                        |
 
-所有采集脚本都建议在项目根目录执行，并统一使用以下参数：
-
-- `--env`：环境名称，脚本会自动映射到 `<env>_table` 和 `base_<env>`
-- `--config`：当前任务目录下的配置文件名
-- `--data_path`：可选，自定义数据输出路径
-
-#### 水果抓取与放置（厨房/客厅）
+示例：
 
 ```bash
 benchmark_python data_collect/pick_place_fruit/fruit_pick_place_collect.py \
   --env kitchen \
-  --config apple_pick_place_config.yaml
+  --config banana_pick_place_config.yaml
 ```
 
-可选环境：
+## 训练
 
-- `kitchen`
-- `apartment`
-
-可选配置：
-
-- `apple_pick_place_config.yaml`
-- `banana_pick_place_config.yaml`
-- `carrot_pick_place_config.yaml`
-- `cucumber_pick_place_config.yaml`
-- `mangosteen_pick_place_config.yaml`
-- `whiteradish_pick_place_config.yaml`
-
-#### 零件放置与箱子闭合（工业）
+采集数据后，回到 `FluxVLA` 根目录启动训练：
 
 ```bash
-benchmark_python data_collect/close_box/box_close_collect.py \
-  --env industry \
-  --config box_close_config.yaml
+cd /path/to/FluxVLA
+bash scripts/train.sh \
+  configs/pi05/fluxbisim/pi05_paligemma_pick_place_banana_full_finetune.py \
+  work_dirs/pi05_paligemma_pick_place_banana_full_finetune
 ```
 
-可选环境：
-
-- `industry`
-
-可选配置：
-
-- `box_close_config.yaml`
-
-#### 抽屉抽拉（客厅）
+可通过 `--cfg-options` 覆盖训练参数：
 
 ```bash
-benchmark_python data_collect/pull_push_drawer/drawer_pull_push_collect.py \
-  --env apartment \
-  --config drawer_pull_push_config.yaml
+bash scripts/train.sh \
+  configs/pi05/fluxbisim/pi05_paligemma_pick_place_banana_full_finetune.py \
+  work_dirs/pi05_paligemma_pick_place_banana_full_finetune \
+  --cfg-options runner.max_steps=10000 runner.save_interval=1000
 ```
 
-可选环境：
+## 评测
 
-- `apartment`
+支持的仿真评测任务：
 
-可选配置：
+```text
+close_box
+pass_book
+pick_place_banana
+pull_push_drawer
+rotate_pitcher_lid
+```
 
-- `drawer_pull_push_config.yaml`
+评测需要启动两个进程。
 
-#### 拧杯盖（客厅矮桌）
+终端 1：启动 Isaac Sim 仿真环境。
 
 ```bash
-benchmark_python data_collect/rotate_pitcher_lid/pitcher_lid_rotate_collect.py \
-  --env apartmentshort \
-  --config pitcher_lid_rotate_config.yaml
+cd /path/to/FluxVLA/FluxBisim
+PYTHON_BIN=benchmark_python ./fluxbisim_benchmark.sh pick_place_banana \
+  --num-episodes 10 \
+  --save-images true \
+  --chunk-size 32
 ```
 
-可选环境：
-
-- `apartmentshort`
-
-可选配置：
-
-- `pitcher_lid_rotate_config.yaml`
-
-#### 书本传递（客厅/工业）
+终端 2：启动 FluxVLA 推理。
 
 ```bash
-benchmark_python data_collect/pass_book/book_pass_collect.py \
-  --env apartment \
-  --config book_pass_config.yaml
+cd /path/to/FluxVLA
+./scripts/fluxbisim_eval.sh \
+  configs/pi05/fluxbisim/pi05_paligemma_pick_place_banana_full_finetune.py \
+  /path/to/checkpoint.pth
 ```
 
-可选环境：
+注意：
 
-- `apartment`
-- `industry`
-
-可选配置：
-
-- `book_pass_config.yaml`
+- `fluxbisim_benchmark.sh` 会启动 `roscore`、`rviz` 和 `evaluate.py`。
+- 如需指定 Isaac Sim Python，请通过 `PYTHON_BIN` 传入。
+- `scripts/fluxbisim_eval.sh` 会根据配置文件名映射任务编号，请确保配置与评测任务一致。

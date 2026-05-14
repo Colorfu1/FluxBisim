@@ -30,36 +30,73 @@ from isaacsim.core.utils.types import ArticulationAction  # noqa: E402
 
 from envs import IsaacsimEnv  # noqa: E402
 
-# Per-task environment variables derived from the config.
-# Each entry is a list of tuples: (config_yaml_key, env_var_name, default_value).
-TASK_ENV_VAR_MAP = {
-    'PickPlaceFruit': [
-        ('fruit', 'FRUIT_NAME', 'banana'),
-        ('plate', 'PLATE_NAME', 'plate'),
-    ],
-    'PassBook': [
-        ('book', 'BOOK_NAME', 'book'),
-        ('bookend', 'BOOKEND_NAME', 'bookend'),
-    ],
-    'RotatePitcherLid': [
-        ('pitcher', 'PITCHER_NAME', 'pitcher'),
-        ('pitcherlid', 'LID_NAME', 'pitcherlid'),
-    ],
-    'PullPushDrawer': [
-        ('object', 'OBJECT_NAME', 'apple_drawer'),
-        ('drawer', 'DRAWER_NAME', 'drawer'),
-    ],
-    'CloseBox': [
-        ('nut', 'NUT_NAME', 'nut'),
-        ('box', 'BOX_NAME', 'box'),
-    ],
-}
-
 # Mapping from internal camera names to ROS topic prefixes.
 CAMERA_NAME_TO_TOPIC = {
     'left_cam': 'camera_l',
     'right_cam': 'camera_r',
     'head_cam': 'camera_f',
+}
+
+# Built-in presets for CLI task names. Each entry selects the simulator scene,
+# task config, episode step budget and object-name environment variables.
+EVAL_TASK_PRESETS = {
+    'close_box': {
+        'env': 'industry',
+        'config': 'data_collect/close_box/box_close_config.yaml',
+        'max_steps': 1760,
+        'env_vars': [
+            ('nut', 'NUT_NAME', 'nut'),
+            ('box', 'BOX_NAME', 'box'),
+        ],
+    },
+    'pass_book': {
+        'env':
+        'apartment',
+        'config':
+        'data_collect/pass_book/book_pass_config.yaml',
+        'max_steps':
+        1280,
+        'env_vars': [
+            ('book', 'BOOK_NAME', 'book'),
+            ('bookend', 'BOOKEND_NAME', 'bookend'),
+        ],
+    },
+    'pick_place_banana': {
+        'env':
+        'kitchen',
+        'config':
+        'data_collect/pick_place_fruit/banana_pick_place_config.yaml',
+        'max_steps':
+        1280,
+        'env_vars': [
+            ('fruit', 'FRUIT_NAME', 'banana'),
+            ('plate', 'PLATE_NAME', 'plate'),
+        ],
+    },
+    'pull_push_drawer': {
+        'env':
+        'apartment',
+        'config':
+        'data_collect/pull_push_drawer/drawer_pull_push_config.yaml',
+        'max_steps':
+        1280,
+        'env_vars': [
+            ('object', 'OBJECT_NAME', 'apple_drawer'),
+            ('drawer', 'DRAWER_NAME', 'drawer'),
+        ],
+    },
+    'rotate_pitcher_lid': {
+        'env':
+        'apartmentshort',
+        'config':
+        'data_collect/rotate_pitcher_lid/pitcher_lid_rotate_config.yaml',
+        'max_steps':
+        1280,
+        'env_vars': [
+            ('pitcher', 'PITCHER_NAME', 'pitcher'),
+            ('pitcherlid', 'LID_NAME', 'pitcherlid'),
+        ],
+    },
 }
 
 
@@ -145,24 +182,19 @@ class IsaacSimROSBridge:
         for cam_name in camera_cfg:
             topic_name = CAMERA_NAME_TO_TOPIC.get(cam_name, cam_name)
             rgb_topic = f"/{topic_name}/color/image_raw"
-            self.image_publishers[cam_name] = rospy.Publisher(rgb_topic,
-                                                              Image,
-                                                              queue_size=1)
+            self.image_publishers[cam_name] = rospy.Publisher(
+                rgb_topic, Image, queue_size=1)
             rospy.loginfo(f"Image publisher: {rgb_topic} ({cam_name})")
 
-        self.joint_left_publisher = rospy.Publisher('/puppet/joint_left',
-                                                    JointState,
-                                                    queue_size=1)
-        self.joint_right_publisher = rospy.Publisher('/puppet/joint_right',
-                                                     JointState,
-                                                     queue_size=1)
+        self.joint_left_publisher = rospy.Publisher(
+            '/puppet/joint_left', JointState, queue_size=1)
+        self.joint_right_publisher = rospy.Publisher(
+            '/puppet/joint_right', JointState, queue_size=1)
 
-        self.env_reset_publisher = rospy.Publisher('/env/reset',
-                                                   String,
-                                                   queue_size=1)
-        self.chunk_done_publisher = rospy.Publisher('/env/chunk_done',
-                                                    Int32,
-                                                    queue_size=1)
+        self.env_reset_publisher = rospy.Publisher(
+            '/env/reset', String, queue_size=1)
+        self.chunk_done_publisher = rospy.Publisher(
+            '/env/chunk_done', Int32, queue_size=1)
 
     def _setup_subscribers(self):
         """Create ROS subscribers for incoming arm joint commands."""
@@ -294,8 +326,8 @@ class IsaacSimROSBridge:
                 rgb_image = self._ensure_uint8(obs[rgb_key].copy())
                 bgr_image = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2BGR)
                 filename = f"head_cam_{self.head_cam_frame_count:06d}.jpg"  # noqa: E231
-                cv2.imwrite(os.path.join(self.head_cam_save_dir, filename),
-                            bgr_image)
+                cv2.imwrite(
+                    os.path.join(self.head_cam_save_dir, filename), bgr_image)
                 self.head_cam_frame_count += 1
         except Exception as e:
             rospy.logwarn(f"Failed to save head_cam image: {e}")
@@ -727,18 +759,17 @@ def cleanup_resources(bridge=None):
     rospy.loginfo('Resource cleanup complete')
 
 
-def setup_task_env_vars(config):
+def setup_task_env_vars(config, env_vars):
     """Populate task-specific environment variables based on the config."""
-    task_name = config.get('task')
-    if task_name not in TASK_ENV_VAR_MAP:
-        rospy.logwarn(f"Unknown task '{task_name}', skipping task env vars. "
-                      f"Known tasks: {list(TASK_ENV_VAR_MAP.keys())}")
-        return
-
-    for cfg_key, env_var, default in TASK_ENV_VAR_MAP[task_name]:
+    for cfg_key, env_var, default in env_vars:
         value = config.get(cfg_key, default)
         os.environ[env_var] = value
         rospy.loginfo(f"Set {env_var}={value}")
+
+
+def normalize_eval_task_name(task_name):
+    """Accept task names typed with spaces, dashes, or underscores."""
+    return task_name.strip().lower().replace('-', '_').replace(' ', '_')
 
 
 def main():
@@ -746,29 +777,16 @@ def main():
     parser = argparse.ArgumentParser(
         description='Isaac Sim & ROS evaluation script')
     parser.add_argument(
-        '--env',
+        '--task',
         type=str,
         required=True,
-        help='Environment name, mapped to TABLE_NAME=<env>_table and '
-        'BASE_NAME=base_<env>. Choices: kitchen, apartment, '
-        'apartmentshort, industry',
-    )
-    parser.add_argument(
-        '--config',
-        type=str,
-        required=True,
-        help='Config file path (relative to project root or absolute)',
-    )
-    parser.add_argument(
-        '--max-steps',
-        type=int,
-        default=1600,
-        help='Maximum steps per episode',
+        help='Evaluation task preset. Choices: '
+        f"{', '.join(sorted(EVAL_TASK_PRESETS))}",
     )
     parser.add_argument(
         '--num-episodes',
         type=int,
-        default=50,
+        default=100,
         help='Number of episodes to run',
     )
     parser.add_argument(
@@ -788,7 +806,18 @@ def main():
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
-    config_path = args.config
+    task_name = normalize_eval_task_name(args.task)
+    if task_name not in EVAL_TASK_PRESETS:
+        parser.error(f"Unknown task preset '{args.task}'. Choices: "
+                     f"{', '.join(sorted(EVAL_TASK_PRESETS))}")
+
+    preset = EVAL_TASK_PRESETS[task_name]
+    env_name = preset['env']
+    config_path = preset['config']
+    max_steps = preset['max_steps']
+    env_vars = preset['env_vars']
+    rospy.loginfo(f"Using task preset: {task_name}")
+
     if not os.path.isabs(config_path):
         config_path = os.path.join(os.path.dirname(__file__), config_path)
 
@@ -803,20 +832,20 @@ def main():
         rospy.logerr(f"Failed to read config file: {e}")
         sys.exit(1)
 
-    os.environ['TABLE_NAME'] = f"{args.env}_table"
-    os.environ['BASE_NAME'] = f"base_{args.env}"
+    os.environ['TABLE_NAME'] = f"{env_name}_table"
+    os.environ['BASE_NAME'] = f"base_{env_name}"
     rospy.loginfo(
-        f"Environment: {args.env} -> TABLE_NAME={os.environ['TABLE_NAME']}, "
+        f"Environment: {env_name} -> TABLE_NAME={os.environ['TABLE_NAME']}, "
         f"BASE_NAME={os.environ['BASE_NAME']}")
 
-    setup_task_env_vars(config)
+    setup_task_env_vars(config, env_vars)
 
     bridge = None
     try:
         rospy.loginfo('Initializing Isaac Sim ROS bridge ...')
         bridge = IsaacSimROSBridge(
             config_path,
-            max_steps=args.max_steps,
+            max_steps=max_steps,
             num_episodes=args.num_episodes,
             save_images=args.save_images,
             chunk_size=args.chunk_size,
