@@ -1,3 +1,16 @@
+# Copyright 2026 Limx Dynamics
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 """PassBook task: hand a book from one arm to the other and place it on the bookend."""
 
 import os
@@ -36,8 +49,8 @@ class PassBook:
             BaseObject(self.bookend_name),
         ]
         self.environment = BaseObject(self.table_name)
-        self.checker = Checker(book_name=self.book_name,
-                               bookend_name=self.bookend_name)
+        self.checker = Checker(
+            book_name=self.book_name, bookend_name=self.bookend_name)
 
     def randomize_objects_position(self):
         """Randomize object positions around their initial poses."""
@@ -116,7 +129,8 @@ class Checker:
 
         # A valid placement must satisfy both the height and the distance check.
         height_check = self.HEIGHT_MIN <= book_height <= self.HEIGHT_MAX
-        distance_check = (self.PLACE_THRESHOLD_MIN <= distance_xy <=
-                          self.PLACE_THRESHOLD_MAX)
+        distance_check = (
+            self.PLACE_THRESHOLD_MIN <= distance_xy <=
+            self.PLACE_THRESHOLD_MAX)
 
         return height_check and distance_check

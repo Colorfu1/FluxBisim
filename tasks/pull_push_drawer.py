@@ -1,3 +1,16 @@
+# Copyright 2026 Limx Dynamics
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 """PullPushDrawer task: open a drawer, place an object inside, and close it."""
 
 import os
@@ -36,8 +49,8 @@ class PullPushDrawer:
             BaseObject(self.drawer_name),
         ]
         self.environment = BaseObject(self.table_name)
-        self.checker = Checker(object_name=self.object_name,
-                               drawer_name=self.drawer_name)
+        self.checker = Checker(
+            object_name=self.object_name, drawer_name=self.drawer_name)
 
     def randomize_objects_position(self):
         """Randomize object positions around their initial poses."""

@@ -1,3 +1,16 @@
+# Copyright 2026 Limx Dynamics
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 """Shared utilities used across task modules."""
 
 from typing import Sequence
@@ -74,8 +87,9 @@ def check_gripper(
         ``True`` if the distance from the (offset) end-effector to the object
         position is at most ``threshold``.
     """
-    manipulator = (env.robot.left_manipulator
-                   if hand == 'left' else env.robot.right_manipulator)
+    manipulator = (
+        env.robot.left_manipulator
+        if hand == 'left' else env.robot.right_manipulator)
     # Isaac Sim returns the EE pose as (position, quaternion) where the
     # quaternion uses the [w, x, y, z] convention. ``ee_offset`` is defined in
     # the end-effector's local frame, so it must be rotated by the EE's world

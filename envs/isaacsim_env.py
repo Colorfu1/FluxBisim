@@ -1,3 +1,16 @@
+# Copyright 2026 Limx Dynamics
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 """Isaac Sim environment wrapper driving a task, a robot and cameras."""
 
 import math
@@ -118,9 +131,10 @@ class IsaacsimEnv:
         cls = getattr(module, self.task_name)
         self.task = cls()
 
-        self.world = World(stage_units_in_meters=1.0,
-                           physics_dt=1.0 / 30.0,
-                           rendering_dt=1.0 / 30.0)
+        self.world = World(
+            stage_units_in_meters=1.0,
+            physics_dt=1.0 / 30.0,
+            rendering_dt=1.0 / 30.0)
 
         self.robot = BaseRobot(self.cfg.get('robot'))
         self.robot.init_robot(self.world)
@@ -154,8 +168,9 @@ class IsaacsimEnv:
             A dictionary of the form ``{'dof_pos': {<joint_name>: <pos>}}``.
         """
         dof_pos = {}
-        dof_poses = (robot1.get_joint_positions().tolist() +
-                     robot2.get_joint_positions().tolist())
+        dof_poses = (
+            robot1.get_joint_positions().tolist() +
+            robot2.get_joint_positions().tolist())
         for i in range(1, len(dof_poses) + 1):
             if i <= 8:
                 dof_pos[f"llink{i}"] = dof_poses[i - 1]

@@ -1,3 +1,16 @@
+# Copyright 2026 Limx Dynamics
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 """Dual-arm robot wrapper built on top of Isaac Sim manipulators."""
 
 import os
@@ -32,8 +45,8 @@ class BaseRobot:
 
     def _load_robot_config(self):
         """Load and return the full robot configuration YAML."""
-        cfg_path = os.path.join(os.path.dirname(__file__), 'cfg',
-                                'robots.yaml')
+        cfg_path = os.path.join(
+            os.path.dirname(__file__), 'cfg', 'robots.yaml')
         with open(cfg_path, 'r', encoding='utf-8') as file:
             config = yaml.safe_load(file)
         return config
@@ -46,8 +59,9 @@ class BaseRobot:
         # Add the robot base prim.
         if self.base_name in self.robot_cfg:
             base_cfg = self.robot_cfg[self.base_name]
-            add_reference_to_stage(usd_path=base_cfg['usd_path'],
-                                   prim_path=f"/World/{self.name}_base")
+            add_reference_to_stage(
+                usd_path=base_cfg['usd_path'],
+                prim_path=f"/World/{self.name}_base")
             base_position = np.array(base_cfg.get('position', [0.0, 0.0, 0.0]))
             base_orientation = np.array(
                 base_cfg.get('orientation', [1.0, 0.0, 0.0, 0.0]))

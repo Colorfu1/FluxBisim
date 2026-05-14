@@ -1,3 +1,16 @@
+# Copyright 2026 Limx Dynamics
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 """Data-collection script for the PassBook task.
 
 The left arm first picks the book from the table and moves it to a handover
@@ -109,8 +122,9 @@ def compute_left_arm_move_action(
     gripper_joint_positions = left_controller._gripper.forward(
         action='open').joint_positions[-2:]
 
-    return ArticulationAction(joint_positions=list(arm_joint_positions) +
-                              list(gripper_joint_positions))
+    return ArticulationAction(
+        joint_positions=list(arm_joint_positions) +
+        list(gripper_joint_positions))
 
 
 def collect_episode_data(
@@ -166,9 +180,8 @@ def collect_episode_data(
         left_action_1 = left_controller.forward(
             picking_position=picking_position_1,
             placing_position=handover_position_1,
-            current_joint_positions=np.array(list(
-                obs['piper']['dof_pos'].values())[:8],
-                                             dtype=float),
+            current_joint_positions=np.array(
+                list(obs['piper']['dof_pos'].values())[:8], dtype=float),
             end_effector_offset=np.array([-0.03, 0.0, 0.28]),
             picking_orientation=picking_orientation_1,
             placing_orientation=handover_orientation_1,
@@ -248,9 +261,8 @@ def collect_episode_data(
         right_actions_2 = right_controller.forward(
             picking_position=picking_position_2,
             placing_position=placing_position_2,
-            current_joint_positions=np.array(list(
-                obs['piper']['dof_pos'].values())[8:],
-                                             dtype=float),
+            current_joint_positions=np.array(
+                list(obs['piper']['dof_pos'].values())[8:], dtype=float),
             end_effector_offset=np.array([-0.1, 0, 0.45]),
             picking_orientation=picking_orientation_2,
             placing_orientation=placing_orientation_2,
@@ -295,10 +307,11 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--env', type=str, default='apartment')
     parser.add_argument('--config', type=str, default='book_pass_config.yaml')
-    parser.add_argument('--data_path',
-                        type=str,
-                        default=None,
-                        help='Path to save the collected data')
+    parser.add_argument(
+        '--data_path',
+        type=str,
+        default=None,
+        help='Path to save the collected data')
     args = parser.parse_args()
 
     cfg_path = os.path.join(os.path.dirname(__file__), args.config)
@@ -352,8 +365,8 @@ def main():
                 data_path = args.data_path
             else:
                 data_path = os.path.join(
-                    os.path.dirname(os.path.dirname(
-                        os.path.dirname(__file__))),
+                    os.path.dirname(
+                        os.path.dirname(os.path.dirname(__file__))),
                     'data',
                     args.env,
                     env.task_name,

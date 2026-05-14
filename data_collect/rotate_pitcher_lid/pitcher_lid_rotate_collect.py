@@ -1,3 +1,16 @@
+# Copyright 2026 Limx Dynamics
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 """Data-collection script for the RotatePitcherLid task.
 
 The left arm holds the pitcher steady while the right arm picks up the lid,
@@ -123,9 +136,8 @@ def collect_episode_data(
         right_actions = right_controller.forward(
             picking_position=right_picking_position,
             placing_position=right_placing_position,
-            current_joint_positions=np.array(list(
-                obs['piper']['dof_pos'].values())[8:],
-                                             dtype=float),
+            current_joint_positions=np.array(
+                list(obs['piper']['dof_pos'].values())[8:], dtype=float),
             end_effector_orientation=right_target_orientation,
             end_effector_offset=np.array([0.0, 0.0, 0.07]),
         )
@@ -136,9 +148,8 @@ def collect_episode_data(
             left_actions = left_controller.forward(
                 picking_position=left_picking_position,
                 placing_position=left_placing_position,
-                current_joint_positions=np.array(list(
-                    obs['piper']['dof_pos'].values())[:8],
-                                                 dtype=float),
+                current_joint_positions=np.array(
+                    list(obs['piper']['dof_pos'].values())[:8], dtype=float),
                 end_effector_orientation=left_target_orientation,
                 end_effector_offset=np.array([-0.3, 0.084, 0.110]),
             )
@@ -167,13 +178,13 @@ def main():
     """Parse CLI arguments, run the collection loop and save successful episodes."""
     parser = argparse.ArgumentParser()
     parser.add_argument('--env', type=str, default='apartmentshort')
-    parser.add_argument('--config',
-                        type=str,
-                        default='pitcher_lid_rotate_config.yaml')
-    parser.add_argument('--data_path',
-                        type=str,
-                        default=None,
-                        help='Path to save the collected data')
+    parser.add_argument(
+        '--config', type=str, default='pitcher_lid_rotate_config.yaml')
+    parser.add_argument(
+        '--data_path',
+        type=str,
+        default=None,
+        help='Path to save the collected data')
     args = parser.parse_args()
 
     cfg_path = os.path.join(os.path.dirname(__file__), args.config)
@@ -227,8 +238,8 @@ def main():
                 data_path = args.data_path
             else:
                 data_path = os.path.join(
-                    os.path.dirname(os.path.dirname(
-                        os.path.dirname(__file__))),
+                    os.path.dirname(
+                        os.path.dirname(os.path.dirname(__file__))),
                     'data',
                     args.env,
                     env.task_name,

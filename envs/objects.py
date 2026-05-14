@@ -1,3 +1,16 @@
+# Copyright 2026 Limx Dynamics
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 """Scene-object wrappers backed by USD references."""
 
 import os
@@ -33,18 +46,18 @@ class BaseObject:
         self.name = name
         self.cfg = self._load_object_config()
         self.usd_path = self._resolve_usd_path(self.cfg['usd_path'])
-        self.init_position = (self.cfg['position']
-                              if init_position is None else init_position)
-        self.init_orientation = (self.cfg['orientation']
-                                 if init_orientation is None else
-                                 init_orientation)
+        self.init_position = (
+            self.cfg['position'] if init_position is None else init_position)
+        self.init_orientation = (
+            self.cfg['orientation']
+            if init_orientation is None else init_orientation)
         self.init_poisition_global = None
         self.object = None
 
     def _load_object_config(self):
         """Load and return this object's configuration block from ``objects.yaml``."""
-        cfg_path = os.path.join(os.path.dirname(__file__), 'cfg',
-                                'objects.yaml')
+        cfg_path = os.path.join(
+            os.path.dirname(__file__), 'cfg', 'objects.yaml')
         with open(cfg_path, 'r', encoding='utf-8') as file:
             config = yaml.safe_load(file)
         return config[self.name]
@@ -76,8 +89,8 @@ class BaseObject:
             raise ValueError(
                 f"Object '{self.name}' has already been initialized.")
 
-        add_reference_to_stage(usd_path=self.usd_path,
-                               prim_path=f"/World/{self.name}")
+        add_reference_to_stage(
+            usd_path=self.usd_path, prim_path=f"/World/{self.name}")
 
         if base_position is not None and base_orientation is not None:
             # Configured pose is relative to the robot base; transform it.
