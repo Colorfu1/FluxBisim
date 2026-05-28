@@ -1,8 +1,8 @@
 headless: False
-task: "RotatePitcherLid"
+task: "HandoverBook"
 robot: "piper"
-pitcher: "pitcher"
-pitcherlid: "pitcherlid"
+book: "book"
+bookend: "bookend"
 max_demo: 400
 cameras:
     left_cam:

@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Data-collection script for the PassBook task.
+"""Data-collection script for the HandoverBook task.
 
 The left arm first picks the book from the table and moves it to a handover
 position; the right arm then grasps the book from the left gripper, moves it
@@ -35,7 +35,7 @@ from isaacsim.core.utils.types import ArticulationAction  # noqa: E402
 
 rootutils.setup_root(__file__, pythonpath=True)
 
-from controllers.tasks.pass_book import (  # noqa: E402
+from controllers.tasks.handover_book import (  # noqa: E402
     LeftArmPickPlaceController, RightArmPickPlaceController)
 from data_collect.utils import append_hdf5  # noqa: E402
 from data_collect.utils import extract_action_from_obs  # noqa: E402
@@ -306,7 +306,8 @@ def main():
     """Parse CLI arguments, run the collection loop and save successful episodes."""
     parser = argparse.ArgumentParser()
     parser.add_argument('--env', type=str, default='apartment')
-    parser.add_argument('--config', type=str, default='book_pass_config.yaml')
+    parser.add_argument(
+        '--config', type=str, default='book_handover_config.yaml')
     parser.add_argument(
         '--data_path',
         type=str,

@@ -1,8 +1,8 @@
 headless: False
-task: "PassBook"
+task: "ScrewPitcherLid"
 robot: "piper"
-book: "book"
-bookend: "bookend"
+pitcher: "pitcher"
+pitcherlid: "pitcherlid"
 max_demo: 400
 cameras:
     left_cam:

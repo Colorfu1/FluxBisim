@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Data-collection script for the RotatePitcherLid task.
+"""Data-collection script for the ScrewPitcherLid task.
 
 The left arm holds the pitcher steady while the right arm picks up the lid,
 places it on top of the pitcher, and rotates the wrist to screw it on.
@@ -34,7 +34,7 @@ from isaacsim.core.utils.rotations import euler_angles_to_quat  # noqa: E402
 
 rootutils.setup_root(__file__, pythonpath=True)
 
-from controllers.tasks.rotate_pitcher_lid import (  # noqa: E402
+from controllers.tasks.screw_pitcher_lid import (  # noqa: E402
     LeftArmPickController, RightArmPickRotateController)
 from data_collect.utils import append_hdf5  # noqa: E402
 from data_collect.utils import extract_action_from_obs  # noqa: E402
@@ -179,7 +179,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--env', type=str, default='apartmentshort')
     parser.add_argument(
-        '--config', type=str, default='pitcher_lid_rotate_config.yaml')
+        '--config', type=str, default='pitcher_lid_screw_config.yaml')
     parser.add_argument(
         '--data_path',
         type=str,

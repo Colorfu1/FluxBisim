@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""RotatePitcherLid task: place the pitcher lid on the pitcher in the target orientation."""
+"""ScrewPitcherLid task: place the pitcher lid on the pitcher in the target orientation."""
 
 import os
 
@@ -26,8 +26,8 @@ from tasks.utils import generate_point_in_circle  # noqa: E402
 from tasks.utils import get_prim_world_pos  # noqa: E402
 
 
-class RotatePitcherLid:
-    """Scene definition for the RotatePitcherLid task.
+class ScrewPitcherLid:
+    """Scene definition for the ScrewPitcherLid task.
 
     Holds the scene objects (pitcher, lid, table) and a :class:`Checker`
     instance that decides when the task is complete.
@@ -89,7 +89,7 @@ class RotatePitcherLid:
 
 
 class Checker:
-    """Success checker for the RotatePitcherLid task."""
+    """Success checker for the ScrewPitcherLid task."""
 
     # Maximum xy distance between the lid and the pitcher opening.
     PLACE_THRESHOLD = 0.015

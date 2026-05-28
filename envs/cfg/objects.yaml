@@ -1,19 +1,19 @@
 # environments
 kitchen_table:
   name: kitchen_table
-  usd_path: assets/environments/KitchenRoom/KitchenRoom_RSS.usd
+  usd_path: assets/environments/KitchenRoom/kitchen_room.usd
   position: [ 0.0, 0.0, 0.0]
   orientation: [1.0, 0.0, 0.0, 0.0]
 
 apartment_table:
   name: apartment_table
-  usd_path: assets/environments/Apartment/department.usd
+  usd_path: assets/environments/Apartment/apartment.usd
   position: [ 0.0, 0.0, 0.0]
   orientation: [1.0, 0.0, 0.0, 0.0]
 
 apartmentshort_table:
   name: apartmentshort_table
-  usd_path: assets/environments/Apartment/apartmentshort.usd
+  usd_path: assets/environments/Apartment/apartment_short.usd
   position: [ 0.0, 0.0, 0.0]
   orientation: [1.0, 0.0, 0.0, 0.0]
 
@@ -36,16 +36,16 @@ nut:
   position: [0.60019, 0.4, 0.75]
   orientation: [0.707107, 0.0, 0.0, 0.707107]
 
-# pass book
+# handover book
 book:
   name: book
-  usd_path: assets/pass_book/book/book.usd
+  usd_path: assets/handover_book/book/book.usd
   position: [0.5, 0.2, 0.75]
   orientation: [0.53022, -0.47429, 0.46855, -0.52381]
 
 bookend:
   name: bookend
-  usd_path: assets/pass_book/bookend/bookend.usd
+  usd_path: assets/handover_book/bookend/bookend.usd
   position: [0.92, -0.45, 0.9]
   orientation: [0.70711, 0.0, 0.0, 0.70711]
 
@@ -105,15 +105,15 @@ apple_drawer:
   position: [ 0.50, 0.3,  0.75]
   orientation: [0.7071, 0.7071, 0.0, 0.0]
 
-# rotate pitcher lid
+# screw pitcher lid
 pitcher:
   name: pitcher
-  usd_path: assets/rotate_pitcher_lid/Pitcher/pitcher.usd
+  usd_path: assets/screw_pitcher_lid/Pitcher/pitcher.usd
   position: [0.58693,0.08, 0.62]
   orientation: [-0.00783, 0.01784, 0.04364, 0.99886]
 
 pitcherlid:
   name: pitcherlid
-  usd_path: assets/rotate_pitcher_lid/PitcherLid/pitcherlid.usd
+  usd_path: assets/screw_pitcher_lid/PitcherLid/pitcherlid.usd
   position: [0.58693,-0.22228, 0.62]
   orientation: [0.86145, 0.0, 0.0, 0.50785]

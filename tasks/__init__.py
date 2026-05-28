@@ -14,15 +14,15 @@
 """Task package: task definitions and success checkers."""
 
 from .close_box import CloseBox as CloseBox
-from .pass_book import PassBook as PassBook
+from .handover_book import HandoverBook as HandoverBook
 from .pick_place_fruit import PickPlaceFruit as PickPlaceFruit
 from .pull_push_drawer import PullPushDrawer as PullPushDrawer
-from .rotate_pitcher_lid import RotatePitcherLid as RotatePitcherLid
+from .screw_pitcher_lid import ScrewPitcherLid as ScrewPitcherLid
 
 __all__ = [
     'CloseBox',
-    'PassBook',
+    'HandoverBook',
     'PickPlaceFruit',
     'PullPushDrawer',
-    'RotatePitcherLid',
+    'ScrewPitcherLid',
 ]

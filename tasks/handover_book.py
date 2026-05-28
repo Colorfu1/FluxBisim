@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""PassBook task: hand a book from one arm to the other and place it on the bookend."""
+"""HandoverBook task: hand a book from one arm to the other and place it on the bookend."""
 
 import os
 
@@ -24,8 +24,8 @@ from envs import BaseObject  # noqa: E402
 from tasks.utils import check_gripper, generate_point_in_circle  # noqa: E402
 
 
-class PassBook:
-    """Scene definition for the PassBook task.
+class HandoverBook:
+    """Scene definition for the HandoverBook task.
 
     Holds the scene objects (book, bookend, table) and a :class:`Checker`
     instance that decides when the task is complete.
@@ -87,7 +87,7 @@ class PassBook:
 
 
 class Checker:
-    """Success checker for the PassBook task."""
+    """Success checker for the HandoverBook task."""
 
     # Minimum xy distance between the book and the bookend at placement.
     PLACE_THRESHOLD_MIN = 0.15

@@ -62,11 +62,11 @@ EVAL_TASK_PRESETS = {
             ('box', 'BOX_NAME', 'box'),
         ],
     },
-    'pass_book': {
+    'handover_book': {
         'env':
         'apartment',
         'config':
-        'data_collect/pass_book/book_pass_config.yaml',
+        'data_collect/handover_book/book_handover_config.yaml',
         'max_steps':
         1280,
         'env_vars': [
@@ -98,11 +98,11 @@ EVAL_TASK_PRESETS = {
             ('drawer', 'DRAWER_NAME', 'drawer'),
         ],
     },
-    'rotate_pitcher_lid': {
+    'screw_pitcher_lid': {
         'env':
         'apartmentshort',
         'config':
-        'data_collect/rotate_pitcher_lid/pitcher_lid_rotate_config.yaml',
+        'data_collect/screw_pitcher_lid/pitcher_lid_screw_config.yaml',
         'max_steps':
         1280,
         'env_vars': [
