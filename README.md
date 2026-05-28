@@ -2,18 +2,27 @@
 
 `FluxBisim` is a dual-arm collaborative manipulation simulation platform built on `Isaac Sim 4.5.0`. Integrated with the `FluxVLA`, it provides a complete simulation workflow for embodied AI tasks, covering scene selection, skill composition, asset configuration, data collection, model training, deployment, and multidimensional evaluation.
 
-## Features
+<p align="center">
+  <video src="docs/fluxbisim.mp4" controls width="800"></video>
+</p>
 
-- Built on `Ubuntu 20.04`, `Isaac Sim 4.5.0`, and `ROS Noetic`.
+## 🌟 Features
+
 - Centers on task composition, flexibly combining primitive skills such as pick-and-place, opening and closing, rotation, pushing and pulling, and handover to create complex dual-arm collaboration tasks that reflect real-world application needs.
 - Uses atomic controllers and the simulation engine to automatically generate high-quality training data at scale.
 - Integrates the `FluxVLA` to support training, deployment, and evaluation of mainstream models in high-fidelity simulation environments.
 
 ## Framework
 
-![FluxBisim framework](./docs/framework.jpg)
+<p align="center">
+  <img src="./docs/framework.jpg" alt="Framework Architecture" width="800">
+</p>
 
-## Installation
+## 📢 Latest News
+
+**\[2026/05/28\]** 🔥 FluxBisim has been open-sourced.
+
+## 🛠️ Installation
 
 ### 1. Clone the Repository
 
@@ -103,7 +112,7 @@ benchmark_python data_collect/pick_place_fruit/fruit_pick_place_collect.py \
 
 Data collected automatically by `FluxBisim` is saved in HDF5 format. To use it for `FluxVLA` training, convert it to the LeRobot Dataset v2.1 format by following the [data conversion guide](https://github.com/FluxVLA/FluxVLA/blob/main/docs/data_convert.md).
 
-## Benchmark
+## 📊 Benchmark
 
 ### Leaderboard
 
@@ -126,16 +135,16 @@ After downloading the dataset, set the data path in the `FluxVLA` training confi
 
 ### Model Evaluation
 
-Start the Isaac Sim simulation environment:
+Run the simulation-based evaluation environment in `FluxBisim`:
 
 ```bash
 cd /path/to/FluxVLA/FluxBisim
 PYTHON_BIN=/path/to/install_dir/isaac-sim-4.5.0/python.sh ./fluxbisim_benchmark.sh pick_place_banana
 ```
 
-Available evaluation task names are `close_box`, `handover_book`, `pick_place_banana`, `pull_push_drawer`, and `screw_pitcher_lid`.
+Supported evaluation tasks are `close_box`, `handover_book`, `pick_place_banana`, `pull_push_drawer`, and `screw_pitcher_lid`.
 
-In a second terminal, start `FluxVLA` inference:
+In a second terminal, launch `FluxVLA` inference:
 
 ```bash
 cd /path/to/FluxVLA
@@ -144,15 +153,15 @@ cd /path/to/FluxVLA
   /path/to/checkpoint.pth
 ```
 
-Note:
+The task ID is inferred from the configuration file name by `scripts/fluxbisim_eval.sh`, so make sure the configuration matches the evaluation task.
 
-- `scripts/fluxbisim_eval.sh` maps the task ID from the configuration file name. Make sure the configuration matches the evaluation task.
+## 🙏 Acknowledgements
 
-## Acknowledgements
+This project builds on the contributions of the following open-source projects and communities: [YCB Benchmark](https://www.ycbbenchmarks.com/), [Lightwheel SimReady](https://simready.com/), [X-Humanoid ArtVIP](https://huggingface.co/datasets/X-Humanoid/ArtVIP), and [Nvidia Omniverse USD](https://docs.omniverse.nvidia.com/usd/latest/index.html). If we missed your project or contribution, please open an issue or pull request so we can properly acknowledge it.
 
-This project builds on the contributions of the following open-source projects and communities: [YCB Benchmark](https://www.ycbbenchmarks.com/), [Lightwheel SimReady](https://simready.com/), [X-Humanoid ArtVIP](https://huggingface.co/datasets/X-Humanoid/ArtVIP), and [Nvidia Omniverse USD](https://docs.omniverse.nvidia.com/usd/latest/index.html). If we have missed any projects or contributions, please open an issue or pull request so we can acknowledge them properly.
+This project also acknowledges AgileX Robotics for providing the URDF model of the dual-arm robotic platform used in this work.
 
-## Open-Source Roadmap
+## Roadmap
 
 - Release more evaluation metrics across three dimensions: spatial interaction, trajectory quality, and task outcomes.
 - Support more dual-arm robots, such as Tron2.
