@@ -2,9 +2,7 @@
 
 `FluxBisim` is a dual-arm collaborative manipulation simulation platform built on `Isaac Sim 4.5.0`. Integrated with the `FluxVLA`, it provides a complete simulation workflow for embodied AI tasks, covering scene selection, skill composition, asset configuration, data collection, model training, deployment, and multidimensional evaluation.
 
-<p align="center">
-  <video src="docs/fluxbisim.mp4" controls width="800"></video>
-</p>
+https://github.com/user-attachments/assets/da04986a-4a37-473f-8d42-68ab41a3e47a
 
 ## 🌟 Features
 
