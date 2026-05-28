@@ -1,43 +1,56 @@
 # FluxBisim
 
-`FluxBisim` 是基于 `Isaac Sim 4.5.0` 的机器人操作仿真环境，为 FluxVLA 提供仿真资产、数据采集脚本、控制器和 ROS 评测入口。
+`FluxBisim` is a dual-arm collaborative manipulation simulation platform built on `Isaac Sim 4.5.0`. Integrated with the `FluxVLA`, it provides a complete simulation workflow for embodied AI tasks, covering scene selection, skill composition, asset configuration, data collection, model training, deployment, and multidimensional evaluation.
 
-## 功能
+## Features
 
-- 基于 `Ubuntu 20.04`、`Isaac Sim 4.5.0` 和 `ROS Noetic`。
-- 覆盖抓取放置、关箱、抽屉推拉、拧杯盖、书本传递等任务。
-- 通过 ROS topic 连接 Isaac Sim 仿真环境与 FluxVLA 推理进程。
+- Built on `Ubuntu 20.04`, `Isaac Sim 4.5.0`, and `ROS Noetic`.
+- Centers on task composition, flexibly combining primitive skills such as pick-and-place, opening and closing, rotation, pushing and pulling, and handover to create complex dual-arm collaboration tasks that reflect real-world application needs.
+- Uses atomic controllers and the simulation engine to automatically generate high-quality training data at scale.
+- Integrates the `FluxVLA` to support training, deployment, and evaluation of mainstream models in high-fidelity simulation environments.
 
-## 框架图
+## Framework
 
-## 安装
+![FluxBisim framework](./docs/framework.jpg)
 
-### 1. 下载仓库
+## Installation
+
+### 1. Clone the Repository
 
 ```bash
 cd FluxVLA
 git clone https://github.com/FluxVLA/FluxBisim.git
 ```
 
-### 2. 下载 3D 资产
+### 2. Download 3D Assets
 
-### 3. 安装 Isaac Sim
+The 3D assets are hosted in the Hugging Face Dataset repository [`limxdynamics/FluxBisimAssets`](https://huggingface.co/datasets/limxdynamics/FluxBisimAssets). Download them to the `assets` directory in the project root:
 
-下载并解压 Isaac Sim 4.5.0：
+```bash
+cd FluxBisim
+mkdir -p assets
+hf download limxdynamics/FluxBisimAssets \
+  --repo-type dataset \
+  --local-dir assets
+```
+
+### 3. Install Isaac Sim
+
+Download and extract Isaac Sim 4.5.0:
 
 ```bash
 wget https://download.isaacsim.omniverse.nvidia.com/isaac-sim-standalone-4.5.0-linux-x86_64.zip
 unzip isaac-sim-standalone-4.5.0-linux-x86_64.zip -d /path/to/install_dir/
 ```
 
-建议为 Isaac Sim Python 配置别名：
+We recommend configuring an alias for the Isaac Sim Python environment:
 
 ```bash
 echo 'alias benchmark_python="/path/to/install_dir/isaac-sim-4.5.0/python.sh"' >> ~/.bashrc
 source ~/.bashrc
 ```
 
-### 3. 安装 ROS Noetic
+### 4. Install ROS Noetic
 
 ```bash
 sudo apt update
@@ -47,40 +60,40 @@ echo "source /opt/ros/noetic/setup.bash" >> ~/.bashrc
 source ~/.bashrc
 ```
 
-首次安装 ROS 后初始化 `rosdep`：
+After installing ROS for the first time, initialize `rosdep`:
 
 ```bash
 sudo rosdep init
 rosdep update
 ```
 
-### 4. 安装 Python 依赖
+### 5. Install Python Dependencies
 
-依赖安装到 Isaac Sim 自带 Python 环境中：
+Install the dependencies into the Python environment bundled with Isaac Sim:
 
 ```bash
 benchmark_python -m pip install --upgrade pip
 benchmark_python -m pip install rootutils PyYAML h5py scipy
 ```
 
-## 数据采集
+## Data Collection
 
 ```bash
 cd /path/to/FluxVLA/FluxBisim
 benchmark_python <collect_script> --env <env_name> --config <config_name> [--data_path <output_dir>]
 ```
 
-可用任务：
+Available tasks:
 
-| 任务         | 脚本                                                          | 环境                    | 配置                                                                                                                                                                                                           |
-| ------------ | ------------------------------------------------------------- | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 水果抓取放置 | `data_collect/pick_place_fruit/fruit_pick_place_collect.py`   | `kitchen`, `apartment`  | `apple_pick_place_config.yaml`, `banana_pick_place_config.yaml`, `carrot_pick_place_config.yaml`, `cucumber_pick_place_config.yaml`, `mangosteen_pick_place_config.yaml`, `whiteradish_pick_place_config.yaml` |
-| 关箱         | `data_collect/close_box/box_close_collect.py`                 | `industry`              | `box_close_config.yaml`                                                                                                                                                                                        |
-| 抽屉推拉     | `data_collect/pull_push_drawer/drawer_pull_push_collect.py`   | `apartment`             | `drawer_pull_push_config.yaml`                                                                                                                                                                                 |
-| 拧杯盖       | `data_collect/screw_pitcher_lid/pitcher_lid_screw_collect.py` | `apartmentshort`        | `pitcher_lid_screw_config.yaml`                                                                                                                                                                                |
-| 书本传递     | `data_collect/handover_book/book_handover_collect.py`         | `apartment`, `industry` | `book_handover_config.yaml`                                                                                                                                                                                    |
+| Task                  | Script                                                        | Environment             | Config                                                                                                                                                                                                         |
+| --------------------- | ------------------------------------------------------------- | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Pick Fruit to Plat    | `data_collect/pick_place_fruit/fruit_pick_place_collect.py`   | `kitchen`, `apartment`  | `apple_pick_place_config.yaml`, `banana_pick_place_config.yaml`, `carrot_pick_place_config.yaml`, `cucumber_pick_place_config.yaml`, `mangosteen_pick_place_config.yaml`, `whiteradish_pick_place_config.yaml` |
+| Place Nut & Close Box | `data_collect/close_box/box_close_collect.py`                 | `industry`              | `box_close_config.yaml`                                                                                                                                                                                        |
+| Store Apple in Drawer | `data_collect/pull_push_drawer/drawer_pull_push_collect.py`   | `apartment`             | `drawer_pull_push_config.yaml`                                                                                                                                                                                 |
+| Screw Pitcher Lid     | `data_collect/screw_pitcher_lid/pitcher_lid_screw_collect.py` | `apartmentshort`        | `pitcher_lid_screw_config.yaml`                                                                                                                                                                                |
+| Handover book         | `data_collect/handover_book/book_handover_collect.py`         | `apartment`, `industry` | `book_handover_config.yaml`                                                                                                                                                                                    |
 
-示例：
+Example:
 
 ```bash
 benchmark_python data_collect/pick_place_fruit/fruit_pick_place_collect.py \
@@ -88,29 +101,41 @@ benchmark_python data_collect/pick_place_fruit/fruit_pick_place_collect.py \
   --config banana_pick_place_config.yaml
 ```
 
-`FluxBisim` 自动采集的数据以 HDF5 格式保存。需要将其转换为 LeRobot Dataset v2.1 格式用于 `FluxVLA` 训练。基于[数据转换指南](https://github.com/FluxVLA/FluxVLA/blob/main/docs/data_convert.md)实现数据格式转换。
+Data collected automatically by `FluxBisim` is saved in HDF5 format. To use it for `FluxVLA` training, convert it to the LeRobot Dataset v2.1 format by following the [data conversion guide](https://github.com/FluxVLA/FluxVLA/blob/main/docs/data_convert.md).
 
-## 评测基准
+## Benchmark
 
-### 排行榜
+### Leaderboard
 
 | Codebase             | Pick Banana to Plate | Place Nut & Close Box | Store Apple in Drawer | Screw Pitcher Lid | Handover Book |
 | -------------------- | :------------------: | :-------------------: | :-------------------: | :---------------: | :-----------: |
 | FluxVLA (GR00T N1.5) |         0.96         |         0.88          |         0.88          |       0.33        |     0.45      |
 | FluxVLA (Pi 0.5)     |         0.96         |         0.87          |         0.80          |       0.31        |     0.82      |
 
-### 数据集与模型权重
+### Dataset
 
-### 模型评测
+The training dataset is hosted in the Hugging Face Dataset repository [`limxdynamics/FluxBisimData`](https://huggingface.co/datasets/limxdynamics/FluxBisimData). It contains data automatically collected by `FluxBisim` and converted to the LeRobot Dataset v2.1 format, ready for `FluxVLA` training.
 
-启动 Isaac Sim 仿真环境。
+```bash
+hf download limxdynamics/FluxBisimData \
+  --repo-type dataset \
+  --local-dir /path/to/FluxVLA/data/FluxBisimData
+```
+
+After downloading the dataset, set the data path in the `FluxVLA` training configuration to this directory.
+
+### Model Evaluation
+
+Start the Isaac Sim simulation environment:
 
 ```bash
 cd /path/to/FluxVLA/FluxBisim
 PYTHON_BIN=/path/to/install_dir/isaac-sim-4.5.0/python.sh ./fluxbisim_benchmark.sh pick_place_banana
 ```
 
-终端 2：启动 FluxVLA 推理。
+Available evaluation task names are `close_box`, `handover_book`, `pick_place_banana`, `pull_push_drawer`, and `screw_pitcher_lid`.
+
+In a second terminal, start `FluxVLA` inference:
 
 ```bash
 cd /path/to/FluxVLA
@@ -119,10 +144,18 @@ cd /path/to/FluxVLA
   /path/to/checkpoint.pth
 ```
 
-注意：
+Note:
 
-- `scripts/fluxbisim_eval.sh` 会根据配置文件名映射任务编号，请确保配置与评测任务一致。
+- `scripts/fluxbisim_eval.sh` maps the task ID from the configuration file name. Make sure the configuration matches the evaluation task.
 
-## 致谢
+## Acknowledgements
 
-## 开源计划
+This project builds on the contributions of the following open-source projects and communities: [YCB Benchmark](https://www.ycbbenchmarks.com/), [Lightwheel SimReady](https://simready.com/), [X-Humanoid ArtVIP](https://huggingface.co/datasets/X-Humanoid/ArtVIP), and [Nvidia Omniverse USD](https://docs.omniverse.nvidia.com/usd/latest/index.html). If we have missed any projects or contributions, please open an issue or pull request so we can acknowledge them properly.
+
+## Open-Source Roadmap
+
+- Release more evaluation metrics across three dimensions: spatial interaction, trajectory quality, and task outcomes.
+- Support more dual-arm robots, such as Tron2.
+- Strengthen domain randomization to improve data diversity and make model evaluation more comprehensive.
+- Support data collection, model training, and evaluation for more scenes and tasks.
+- Support data collection, model training, and evaluation for whole-body VLA models.
